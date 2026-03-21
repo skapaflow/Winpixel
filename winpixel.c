@@ -48,9 +48,9 @@ int *KEYR = NULL;
 
 int      wpx_mouse_left_nclicks  = 0;
 int      wpx_mouse_right_nclicks = 0;
-int32_t  wpx_mouse_whell         = 0;
-int      wpx_mouse_whell_down    = 0;
-int      wpx_mouse_whell_press   = 0;
+int      wpx_mouse_wheel         = 0;
+int      wpx_mouse_wheel_down    = 0;
+int      wpx_mouse_wheel_press   = 0;
 uint32_t wpx_mouse_left_down     = 0;
 uint32_t wpx_mouse_left_press    = 0;
 uint32_t wpx_mouse_left_up       = 0;
@@ -151,14 +151,16 @@ static LRESULT winpixel_events (HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
 			wpx_mouse_left_nclicks = 0;
 			wpx_mouse_right_nclicks = 0;
 			wpx_click_count = 0;
-			// wpx_mouse_whell_down = (GetAsyncKeyState(VK_MBUTTON) & 0x8000);
+			// wpx_mouse_wheel = 0;
+			// wpx_mouse_wheel_down = (GetAsyncKeyState(VK_MBUTTON) & 0x8000);
 			break;
 		// case WM_MOUSEMOVE:
-			// wpx_mouse_whell_down = (GetAsyncKeyState(VK_MBUTTON) & 0x8000);
-			// wpx_mouse_whell = 0;
-			// break;
+			// wpx_mouse_wheel_down = (GetAsyncKeyState(VK_MBUTTON) & 0x8000);
+			// wpx_mouse_wheel = 0;
+			break;
 		case WM_MOUSEWHEEL:
-			wpx_mouse_whell += ((short) HIWORD(wparam) < 0 ? -1 : 1);
+			wpx_mouse_wheel = (short) HIWORD(wparam);
+			wpx_mouse_wheel = (wpx_mouse_wheel < 0 ? -1 : (wpx_mouse_wheel > 0 ? 1 : wpx_mouse_wheel));
 			break;
 		case WM_LBUTTONDOWN:
 			if (wpx_click_count == 0)
@@ -466,6 +468,7 @@ void WINPIXELCALL winpixel_render (wpx_COLOR background, int delay) {
 	// wpx_lmouse_up = 0;
 	// wpx_rmouse_press = 0;
 	// wpx_rmouse_up = 0;
+	wpx_mouse_wheel = 0;
 	wpx_keypress = 0;
 	wpx_keychar[0] = 0;
 	wpx_mouse_left_nclicks = 0;
@@ -477,10 +480,10 @@ void WINPIXELCALL winpixel_render (wpx_COLOR background, int delay) {
 	wpx_mouse_left_up = 0;
 	wpx_mouse_right_up = 0;
 
-	static int whell_press = 0;
-	wpx_mouse_whell_down = (GetAsyncKeyState(VK_MBUTTON) & 0x8000);
-	whell_press = (wpx_mouse_whell_down ? whell_press+1 : 0);
-	wpx_mouse_whell_press = (whell_press == 1);
+	static int wheel_press = 0;
+	wpx_mouse_wheel_down = (GetAsyncKeyState(VK_MBUTTON) & 0x8000);
+	wheel_press = (wpx_mouse_wheel_down ? wheel_press+1 : 0);
+	wpx_mouse_wheel_press = (wheel_press == 1);
 
 	__wpx_fps_update__(&_fps_);
 	wpx_fps = __wpx_fps_get__(&_fps_);

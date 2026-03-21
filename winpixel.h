@@ -305,9 +305,9 @@ extern WINPIXELDLL int WPX_W2, WPX_H2; /* dividido por 2 */
 extern WINPIXELDLL int wpx_exit;
 extern WINPIXELDLL int wpx_mouse_left_nclicks;
 extern WINPIXELDLL int wpx_mouse_right_nclicks;
-extern WINPIXELDLL int32_t wpx_mouse_whell;
-extern WINPIXELDLL int wpx_mouse_whell_down;
-extern WINPIXELDLL int wpx_mouse_whell_press;
+extern WINPIXELDLL int wpx_mouse_wheel;
+extern WINPIXELDLL int wpx_mouse_wheel_down;
+extern WINPIXELDLL int wpx_mouse_wheel_press;
 extern WINPIXELDLL uint32_t wpx_mouse_left_down;
 extern WINPIXELDLL uint32_t wpx_mouse_left_press;
 extern WINPIXELDLL uint32_t wpx_mouse_left_up;
