@@ -27,6 +27,9 @@ extern "C"
 
 #include <windows.h>
 
+#undef near
+#undef far
+
 #ifndef M_PI
 	#define M_PI 3.14159265358979323846 /* ou outra precisão necessária */
 #endif
@@ -58,6 +61,7 @@ extern "C"
 #define CYAN       0x00FFFF
 #define DARKCYAN   0x008080
 #define PETROBLUE  0x084d6e
+#define BLUEPRINT  0x19294E
 #define LIME       0x00FF00
 #define GREEN      0x008000
 #define DARKGREEN  0x004000
@@ -319,77 +323,79 @@ extern WINPIXELDLL int wpx_keypress;
 extern WINPIXELDLL char wpx_keychar[2];
 extern WINPIXELDLL char *wpx_dropfile;
 /* window */
-extern WINPIXELDLL int WINPIXELCALL winpixel_window (const char *, int, int);
-extern WINPIXELDLL void WINPIXELCALL winpixel_maximize (void);
-extern WINPIXELDLL void WINPIXELCALL winpixel_render (wpx_COLOR, int);
-extern WINPIXELDLL void WINPIXELCALL winpixel_close (void);
+WINPIXELDLL int WINPIXELCALL winpixel_window (const char *, int, int);
+WINPIXELDLL void WINPIXELCALL winpixel_maximize (void);
+WINPIXELDLL void WINPIXELCALL winpixel_render (wpx_COLOR, int);
+WINPIXELDLL void WINPIXELCALL winpixel_close (void);
 /* input */
-extern WINPIXELDLL int WINPIXELCALL key (int);
-extern WINPIXELDLL int WINPIXELCALL key_press (int);
-extern WINPIXELDLL int WINPIXELCALL key_release (int);
+WINPIXELDLL int WINPIXELCALL key (int);
+WINPIXELDLL int WINPIXELCALL key_press (int);
+WINPIXELDLL int WINPIXELCALL key_release (int);
 /* primitives */
-extern WINPIXELDLL wpx_RGB WINPIXELCALL hex_to_rgb (wpx_COLOR);
-extern WINPIXELDLL wpx_COLOR WINPIXELCALL rgb_to_hex (int, int, int);
-extern WINPIXELDLL void WINPIXELCALL wpx_pixel (int, int, wpx_COLOR);
-extern WINPIXELDLL wpx_COLOR WINPIXELCALL wpx_getpixel (int, int);
-extern WINPIXELDLL void WINPIXELCALL wpx_line (int, int, int, int, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_line_gap (int, int, int, int, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_line_dash (int, int, int, int, float, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_line_dashed (int, int, int, int, float, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_rect (int, int, int, int, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_rect_center (int, int, int, int, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_rect_fill (int, int, int, int, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_circle (int, int, int, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_circle_fill (int, int, int, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_triangle_fill (vec2i *, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_ex (vec2f *, float, float, float, float, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_ellipse (int, int, int, int, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_bezier_thick (vec2f, vec2f, float, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_spline (float, float, float, float, float, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_spline_bezier_quadratic (const vec2f *, int, float, wpx_COLOR);
-extern WINPIXELDLL void WINPIXELCALL wpx_spline_bezier_cubic (const vec2f *, int, float, wpx_COLOR);
+WINPIXELDLL wpx_RGB WINPIXELCALL hex_to_rgb (wpx_COLOR);
+WINPIXELDLL wpx_COLOR WINPIXELCALL rgb_to_hex (int, int, int);
+WINPIXELDLL void WINPIXELCALL wpx_pixel (int, int, wpx_COLOR);
+WINPIXELDLL wpx_COLOR WINPIXELCALL wpx_getpixel (int, int);
+WINPIXELDLL void WINPIXELCALL wpx_line (int, int, int, int, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_line_gap (int, int, int, int, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_line_dash (int, int, int, int, float, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_line_dashed (int, int, int, int, float, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_rect (int, int, int, int, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_rect_center (int, int, int, int, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_rect_fill (int, int, int, int, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_circle (int, int, int, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_circle_fill (int, int, int, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_triangle_fill (vec2i *, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_ex (vec2f *, float, float, float, float, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_ellipse (int, int, int, int, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_bezier_thick (vec2f, vec2f, float, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_spline (float, float, float, float, float, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_spline_gap (int, int, int, int, float, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_spline_dashed (int, int, int, int, float, float, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_spline_bezier_quadratic (const vec2f *, int, float, wpx_COLOR);
+WINPIXELDLL void WINPIXELCALL wpx_spline_bezier_cubic (const vec2f *, int, float, wpx_COLOR);
 /* math */
-extern WINPIXELDLL int WINPIXELCALL fequal (float, float);
-extern WINPIXELDLL char WINPIXELCALL *strfmt (char *, int64_t);
-extern WINPIXELDLL const char WINPIXELCALL *vbytes (int64_t);
-extern WINPIXELDLL float WINPIXELCALL lerp (float, float, float);
-extern WINPIXELDLL float WINPIXELCALL invlerp (float, float, float);
-extern WINPIXELDLL float WINPIXELCALL normalize (float, float, float);
-extern WINPIXELDLL float WINPIXELCALL map (float, float, float, float, float);
-extern WINPIXELDLL float WINPIXELCALL wrap (float, float, float);
-extern WINPIXELDLL float WINPIXELCALL clamp (float, float, float);
-extern WINPIXELDLL float WINPIXELCALL distance_point (float, float, float, float);
-extern WINPIXELDLL float WINPIXELCALL direction_point (float, float, float, float);
-extern WINPIXELDLL int WINPIXELCALL isprime (int);
-extern WINPIXELDLL uint32_t WINPIXELCALL hash (const char *);
-extern WINPIXELDLL void WINPIXELCALL int_shuffle (int *, int);
-extern WINPIXELDLL int WINPIXELCALL line_in_point (rec4f, vec2f, float);
-extern WINPIXELDLL int WINPIXELCALL line_in_line (rec4f, rec4f);
-extern WINPIXELDLL vec2f WINPIXELCALL middle_line (float, float, float, float);
-extern WINPIXELDLL int32_t WINPIXELCALL sqrt_int (int32_t);
-extern WINPIXELDLL void WINPIXELCALL noise_generator (WPX_NOISEGEN *, float);
-extern WINPIXELDLL float WINPIXELCALL noise (WPX_NOISEGEN *);
-extern WINPIXELDLL void WINPIXELCALL noise_reset (WPX_NOISEGEN *);
-extern WINPIXELDLL void WINPIXELCALL noise_increment (WPX_NOISEGEN *, float);
+WINPIXELDLL int WINPIXELCALL fequal (float, float);
+WINPIXELDLL char WINPIXELCALL *strfmt (char *, int64_t);
+WINPIXELDLL const char WINPIXELCALL *vbytes (int64_t);
+WINPIXELDLL float WINPIXELCALL lerp (float, float, float);
+WINPIXELDLL float WINPIXELCALL invlerp (float, float, float);
+WINPIXELDLL float WINPIXELCALL normalize (float, float, float);
+WINPIXELDLL float WINPIXELCALL map (float, float, float, float, float);
+WINPIXELDLL float WINPIXELCALL wrap (float, float, float);
+WINPIXELDLL float WINPIXELCALL clamp (float, float, float);
+WINPIXELDLL float WINPIXELCALL distance_point (float, float, float, float);
+WINPIXELDLL float WINPIXELCALL direction_point (float, float, float, float);
+WINPIXELDLL int WINPIXELCALL isprime (int);
+WINPIXELDLL uint32_t WINPIXELCALL hash (const char *);
+WINPIXELDLL void WINPIXELCALL int_shuffle (int *, int);
+WINPIXELDLL int WINPIXELCALL line_in_point (rec4f, vec2f, float);
+WINPIXELDLL int WINPIXELCALL line_in_line (rec4f, rec4f);
+WINPIXELDLL vec2f WINPIXELCALL middle_line (float, float, float, float);
+WINPIXELDLL int32_t WINPIXELCALL sqrt_int (int32_t);
+WINPIXELDLL void WINPIXELCALL noise_generator (WPX_NOISEGEN *, float);
+WINPIXELDLL float WINPIXELCALL noise (WPX_NOISEGEN *);
+WINPIXELDLL void WINPIXELCALL noise_reset (WPX_NOISEGEN *);
+WINPIXELDLL void WINPIXELCALL noise_increment (WPX_NOISEGEN *, float);
 /* output */
-extern WINPIXELDLL void WINPIXELCALL wpx_text_ex (int, wpx_COLOR, int, wpx_COLOR, int, int, int, const char *, ...);
-extern WINPIXELDLL void WINPIXELCALL wpx_text_center (wpx_COLOR, int, int, int, const char *, ...);
-extern WINPIXELDLL void WINPIXELCALL wpx_text (wpx_COLOR, int, int, int, const char *, ...);
+WINPIXELDLL void WINPIXELCALL wpx_text_ex (int, wpx_COLOR, int, wpx_COLOR, int, int, int, const char *, ...);
+WINPIXELDLL void WINPIXELCALL wpx_text_center (wpx_COLOR, int, int, int, const char *, ...);
+WINPIXELDLL void WINPIXELCALL wpx_text (wpx_COLOR, int, int, int, const char *, ...);
 /* sound */
-extern WINPIXELDLL int WINPIXELCALL wpx_sound_play (const char *, int);
-extern WINPIXELDLL int WINPIXELCALL wpx_music_open (const char *, const char *);
-extern WINPIXELDLL int WINPIXELCALL wpx_music_play (const char *);
-extern WINPIXELDLL int WINPIXELCALL wpx_music_pause (const char *);
-extern WINPIXELDLL int WINPIXELCALL wpx_music_resume (const char *);
-extern WINPIXELDLL int WINPIXELCALL wpx_music_volume (const char *, int);
-extern WINPIXELDLL int WINPIXELCALL wpx_music_balance (const char *, int);
-extern WINPIXELDLL long WINPIXELCALL wpx_music_length (const char *);
-extern WINPIXELDLL long WINPIXELCALL wpx_music_position (const char *);
-extern WINPIXELDLL int WINPIXELCALL wpx_music_seek (const char *, long);
-extern WINPIXELDLL int WINPIXELCALL wpx_music_close (const char *);
+WINPIXELDLL int WINPIXELCALL wpx_sound_play (const char *, int);
+WINPIXELDLL int WINPIXELCALL wpx_music_open (const char *, const char *);
+WINPIXELDLL int WINPIXELCALL wpx_music_play (const char *);
+WINPIXELDLL int WINPIXELCALL wpx_music_pause (const char *);
+WINPIXELDLL int WINPIXELCALL wpx_music_resume (const char *);
+WINPIXELDLL int WINPIXELCALL wpx_music_volume (const char *, int);
+WINPIXELDLL int WINPIXELCALL wpx_music_balance (const char *, int);
+WINPIXELDLL long WINPIXELCALL wpx_music_length (const char *);
+WINPIXELDLL long WINPIXELCALL wpx_music_position (const char *);
+WINPIXELDLL int WINPIXELCALL wpx_music_seek (const char *, long);
+WINPIXELDLL int WINPIXELCALL wpx_music_close (const char *);
 /* sprite */
-extern WINPIXELDLL void WINPIXELCALL wpx_draw_image (uint32_t *, rec4i, rec4i);
-extern WINPIXELDLL uint32_t WINPIXELCALL *wpx_load_image (const char *, int *, int *);
+WINPIXELDLL void WINPIXELCALL wpx_draw_image (uint32_t *, rec4i, rec4i);
+WINPIXELDLL uint32_t WINPIXELCALL *wpx_load_image (const char *, int *, int *);
 
 #ifdef __cplusplus
 } // __cplusplus defined.

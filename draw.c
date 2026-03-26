@@ -680,6 +680,44 @@ void WINPIXELCALL wpx_spline (
 	}
 }
 
+void WINPIXELCALL wpx_spline_gap (
+	int       x,
+	int       y,
+	int       w,
+	int       h,
+	float     thick,
+	wpx_COLOR color) {
+
+	vec2i m = {(x+w)/2, (y+h)/2};
+	wpx_spline((x+m.x)/2, (y+m.y)/2, (w+m.x)/2, (h+m.y)/2, thick, color);
+}
+
+void WINPIXELCALL wpx_spline_dashed (
+	int       x,
+	int       y,
+	int       w,
+	int       h,
+	float     thick,
+	float     dash,
+	wpx_COLOR color) {
+
+	float dis = distance_point(x, y, w, h);
+
+	for (int i = 0; i < roundf(dis/fmaxf(dash,1)) + 1; i++) {
+
+		float vel = normalize(i, 0.0f, (dis/fmaxf(dash,1)));
+		vec2i b = {lerp(x, w, vel), lerp(y, h, vel)};
+	#if 0
+		wpx_circle(wpx_render, b.x, b.y, 5, color);
+	#endif
+		static vec2i a = {0,0};
+		if (i)
+			wpx_spline_gap(a.x, a.y, b.x, b.y, thick, color);
+		a = (vec2i) {b.x, b.y};
+	}
+}
+
+
 // Draw spline segment: Quadratic Bezier, 2 points, 1 control point
 void __wpx_spline_segment_bezier_quadratic__ (
 	vec2f    p1,
