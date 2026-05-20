@@ -6,6 +6,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #define WRGB(r,g,b)     (((uint32_t)((r) & 0xFF) << 24) | ((uint32_t)((g) & 0xFF) << 16) | ((uint32_t)((b) & 0xFF) << 8) | 0xFF)
 #define WRGBA(r,g,b,a)  (((uint32_t)((r) & 0xFF) << 24) | ((uint32_t)((g) & 0xFF) << 16) | ((uint32_t)((b) & 0xFF) << 8) | ((uint32_t)((a) & 0xFF)))
 
@@ -147,3 +150,23 @@ WINPIXELDLL void WINPIXELCALL wpx_sprite_draw_sub (const WPX_Sprite *s, int x, i
 }
 
 #undef _WPX_IS_COLORKEY
+
+/* ---------------------------------------------------------------
+ * Screenshot
+ * --------------------------------------------------------------- */
+
+WINPIXELDLL void WINPIXELCALL wpx_write_png (const char *name) {
+    int w = wpx_render.w;
+    int h = wpx_render.h;
+    unsigned char *data = malloc((size_t)w * h * 4);
+    if (!data) return;
+    for (int i = 0; i < w * h; i++) {
+        uint32_t c      = wpx_render.buffer_screen[i];
+        data[i * 4 + 0] = (c >> 24) & 0xFF;
+        data[i * 4 + 1] = (c >> 16) & 0xFF;
+        data[i * 4 + 2] = (c >>  8) & 0xFF;
+        data[i * 4 + 3] = (c      ) & 0xFF;
+    }
+    stbi_write_png(name, w, h, 4, data, w * 4);
+    free(data);
+}

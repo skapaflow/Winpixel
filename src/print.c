@@ -217,3 +217,46 @@ WINPIXELDLL void WINPIXELCALL wpx_text (Color32 color, int scale, int x, int y, 
 		wpx_text_standard(0, color, scale, 0x000000, 1, x, y, buf);
 	va_end(va);
 }
+
+WINPIXELDLL void WINPIXELCALL wpx_text_measure (const char *str, int scale, int *w, int *h) {
+
+	const int len = 6;
+	scale += 1;
+	if (w) *w = scale * len * (int)strlen(str);
+	if (h) *h = scale * len;
+}
+
+// printf-style formatter backed by a ring of static buffers.
+// Returned pointer stays valid for CAT_POOL_SIZE more calls.
+const char *cat (const char *fmt, ...) {
+
+#ifndef CAT_POOL_SIZE
+    #define CAT_POOL_SIZE   10      // number of rotating slots
+#endif
+#ifndef CAT_BUF_SIZE
+    #define CAT_BUF_SIZE  1024      // bytes per slot
+#endif
+
+    static char pool[CAT_POOL_SIZE][CAT_BUF_SIZE];
+    static int  slot = 0;
+
+    char *buf = pool[slot];
+    memset(buf, 0, CAT_BUF_SIZE);
+
+    if (fmt != NULL) {
+        va_list args;
+        va_start(args, fmt);
+        int written = vsnprintf(buf, CAT_BUF_SIZE, fmt, args);
+        va_end(args);
+
+        if (written >= CAT_BUF_SIZE) {
+            // overflow: replace last 3 chars with "..."
+            char *tail = buf + CAT_BUF_SIZE - 4;
+            snprintf(tail, 4, "...");
+        }
+
+        if (++slot >= CAT_POOL_SIZE) slot = 0;
+    }
+
+    return buf;
+}

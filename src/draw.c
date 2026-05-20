@@ -146,6 +146,16 @@ void WINPIXELCALL wpx_rect_fill (int x, int y, int w, int h, Color32 color) {
 		wpx_line(x, current_y, x + w, current_y, color);
 }
 
+void WINPIXELCALL wpx_rect_fill_grid (int x, int y, int w, int h, Color32 color) {
+
+	if (w < 0) { x += w; w = -w; }
+	if (h < 0) { y += h; h = -h; }
+	int y_end = y + h;
+	for (int cy = y; cy < y_end; cy++)
+		for (int cx = x; cx < x + w; cx++)
+			if ((cx + cy) & 1) wpx_pixel(cx, cy, color);
+}
+
 void WINPIXELCALL wpx_circle (int x0, int y0, int radius, Color32 color) {
 
 	int x = radius-1;
@@ -422,6 +432,33 @@ next:
 
 	#undef _swap
 	#undef _DRAWLINE
+}
+
+/* DEFINITION: SCREEN-DOOR TRANSPARENCY, ORDERED DITHERING */
+WINPIXELDLL void WINPIXELCALL wpx_circle_fill_grid (int xc, int yc, int radius, Color32 col) {
+
+    #define _DRAWLINE_GRID(sx,ex,ny)\
+        {for (int i = (sx); i <= (ex); i++) { if (((i) + (ny)) & 1) wpx_pixel(i, (ny), col); }}
+
+    int x = 0;
+    int y = radius;
+    int p = 3 - 2 * radius;
+
+    if (!radius)
+        return;
+
+    while (y >= x) {
+        _DRAWLINE_GRID(xc - x, xc + x, yc - y);
+        _DRAWLINE_GRID(xc - y, xc + y, yc - x);
+        _DRAWLINE_GRID(xc - x, xc + x, yc + y);
+        _DRAWLINE_GRID(xc - y, xc + y, yc + x);
+        if (p < 0)
+            p += 4 * x++ + 6;
+        else
+            p += 4 * (x++ - y--) + 10;
+    }
+
+    #undef _DRAWLINE_GRID
 }
 
 /* DEFINITION: SCREEN-DOOR TRANSPARENCY, ORDERED DITHERING */

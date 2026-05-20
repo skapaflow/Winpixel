@@ -108,7 +108,8 @@ uint32_t WINPIXELCALL hash (const char *str) {
 
 	size_t i = 0;
 	uint32_t hash = 0;
-	while (i != strlen(str)) {
+	size_t len = strlen(str);
+	while (i != len) {
 		hash += str[i++];
 		hash += hash << 10;
 		hash ^= hash >> 6;

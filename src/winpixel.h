@@ -271,8 +271,10 @@ WINPIXELDLL void WINPIXELCALL wpx_line_dashed (int x, int y, int w, int h, float
 WINPIXELDLL void WINPIXELCALL wpx_rect (int x, int y, int w, int h, Color32 color);
 WINPIXELDLL void WINPIXELCALL wpx_rect_center (int x, int y, int w, int h, Color32 color);         /* x,y is the center */
 WINPIXELDLL void WINPIXELCALL wpx_rect_fill (int x, int y, int w, int h, Color32 color);
+WINPIXELDLL void WINPIXELCALL wpx_rect_fill_grid (int x, int y, int w, int h, Color32 color);      /* 50% screen-door transparency */
 WINPIXELDLL void WINPIXELCALL wpx_circle (int x, int y, int radius, Color32 color);
 WINPIXELDLL void WINPIXELCALL wpx_circle_fill (int xc, int yc, int radius, Color32 color);
+WINPIXELDLL void WINPIXELCALL wpx_circle_fill_grid (int xc, int yc, int radius, Color32 color);    /* 50% screen-door transparency */
 WINPIXELDLL void WINPIXELCALL wpx_triangle_fill (vec2i *triangle, Color32 color);                   /* triangle[3] */
 WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_grid (vec2i *triangle, Color32 color);              /* triangle[3], 50% screen-door transparency */
 WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_ex (vec2f *triangle, float x, float y, float scale, float angle, Color32 color); /* triangle[3], rotate+scale+translate */
@@ -289,20 +291,23 @@ WINPIXELDLL void WINPIXELCALL wpx_spline_bezier_cubic (const vec2f *points, int 
 WINPIXELDLL void WINPIXELCALL wpx_text (Color32 color, int scale, int x, int y, const char *fmt, ...);
 WINPIXELDLL void WINPIXELCALL wpx_text_center (Color32 color, int scale, int x, int y, const char *fmt, ...);
 WINPIXELDLL void WINPIXELCALL wpx_text_ex (int center, Color32 color, int scale, Color32 bcolor, int gap, int x, int y, const char *fmt, ...); /* center=1 centers text; bcolor=background shadow color */
+WINPIXELDLL void WINPIXELCALL wpx_text_measure (const char *str, int scale, int *w, int *h); /* total pixel size of str at given scale */
+WINPIXELDLL const char WINPIXELCALL *cat (const char *fmt, ...);
 // -------------------------
 // Sprite - public API
 // -------------------------
 WINPIXELDLL WPX_Sprite *WINPIXELCALL wpx_sprite_create (int w, int h); /* RGBA Format! */
 WINPIXELDLL WPX_Sprite *WINPIXELCALL wpx_sprite_load (const char *path); /* RGBA Format! */
-WINPIXELDLL void        WINPIXELCALL wpx_sprite_free (WPX_Sprite *s);
-WINPIXELDLL void        WINPIXELCALL wpx_sprite_set_pixel (WPX_Sprite *s, int x, int y, Color32 color);
-WINPIXELDLL Color32     WINPIXELCALL wpx_sprite_get_pixel (const WPX_Sprite *s, int x, int y);
-WINPIXELDLL void        WINPIXELCALL wpx_sprite_fill (WPX_Sprite *s, Color32 color);
-WINPIXELDLL void        WINPIXELCALL wpx_sprite_clear (WPX_Sprite *s);
-WINPIXELDLL void        WINPIXELCALL wpx_sprite_draw (const WPX_Sprite *s, int x, int y);
-WINPIXELDLL void        WINPIXELCALL wpx_sprite_draw_scale (const WPX_Sprite *s, int x, int y, int scale);
-WINPIXELDLL void        WINPIXELCALL wpx_sprite_draw_flip (const WPX_Sprite *s, int x, int y, bool flip_x, bool flip_y);
-WINPIXELDLL void        WINPIXELCALL wpx_sprite_draw_sub (const WPX_Sprite *s, int x, int y, recti src);
+WINPIXELDLL void WINPIXELCALL wpx_sprite_free (WPX_Sprite *s);
+WINPIXELDLL void WINPIXELCALL wpx_sprite_set_pixel (WPX_Sprite *s, int x, int y, Color32 color);
+WINPIXELDLL Color32 WINPIXELCALL wpx_sprite_get_pixel (const WPX_Sprite *s, int x, int y);
+WINPIXELDLL void WINPIXELCALL wpx_sprite_fill (WPX_Sprite *s, Color32 color);
+WINPIXELDLL void WINPIXELCALL wpx_sprite_clear (WPX_Sprite *s);
+WINPIXELDLL void WINPIXELCALL wpx_sprite_draw (const WPX_Sprite *s, int x, int y);
+WINPIXELDLL void WINPIXELCALL wpx_sprite_draw_scale (const WPX_Sprite *s, int x, int y, int scale);
+WINPIXELDLL void WINPIXELCALL wpx_sprite_draw_flip (const WPX_Sprite *s, int x, int y, bool flip_x, bool flip_y);
+WINPIXELDLL void WINPIXELCALL wpx_sprite_draw_sub (const WPX_Sprite *s, int x, int y, recti src);
+WINPIXELDLL void WINPIXELCALL wpx_write_png (const char *name); /* save framebuffer to PNG */
 // -------------------------
 // Math - public API
 // -------------------------
