@@ -155,7 +155,24 @@ WINPIXELDLL void WINPIXELCALL wpx_sprite_draw_sub (const WPX_Sprite *s, int x, i
  * Screenshot
  * --------------------------------------------------------------- */
 
-WINPIXELDLL void WINPIXELCALL wpx_write_png (const char *name) {
+WINPIXELDLL void WINPIXELCALL wpx_write_png (const WPX_Sprite *sprite, const char *name) {
+    if (!sprite) return;
+    int w = sprite->w;
+    int h = sprite->h;
+    unsigned char *data = malloc((size_t)w * h * 4);
+    if (!data) return;
+    for (int i = 0; i < w * h; i++) {
+        uint32_t c      = sprite->pixels[i];
+        data[i * 4 + 0] = (c >> 24) & 0xFF;
+        data[i * 4 + 1] = (c >> 16) & 0xFF;
+        data[i * 4 + 2] = (c >>  8) & 0xFF;
+        data[i * 4 + 3] = (c      ) & 0xFF;
+    }
+    stbi_write_png(name, w, h, 4, data, w * 4);
+    free(data);
+}
+
+WINPIXELDLL void WINPIXELCALL wpx_screenshot (const char *name) {
     int w = wpx_render.w;
     int h = wpx_render.h;
     unsigned char *data = malloc((size_t)w * h * 4);

@@ -307,7 +307,8 @@ WINPIXELDLL void WINPIXELCALL wpx_sprite_draw (const WPX_Sprite *s, int x, int y
 WINPIXELDLL void WINPIXELCALL wpx_sprite_draw_scale (const WPX_Sprite *s, int x, int y, int scale);
 WINPIXELDLL void WINPIXELCALL wpx_sprite_draw_flip (const WPX_Sprite *s, int x, int y, bool flip_x, bool flip_y);
 WINPIXELDLL void WINPIXELCALL wpx_sprite_draw_sub (const WPX_Sprite *s, int x, int y, recti src);
-WINPIXELDLL void WINPIXELCALL wpx_write_png (const char *name); /* save framebuffer to PNG */
+WINPIXELDLL void WINPIXELCALL wpx_write_png  (const WPX_Sprite *sprite, const char *name);
+WINPIXELDLL void WINPIXELCALL wpx_screenshot (const char *name);
 // -------------------------
 // Math - public API
 // -------------------------
