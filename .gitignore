@@ -3,6 +3,7 @@ CLAUDE.md
 
 # Build output
 lib/
+.test/
 *.exe
 *.o
 *.obj

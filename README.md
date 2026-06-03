@@ -17,7 +17,7 @@ cd src
 make
 ```
 
-Produces `winpixel.dll` and `winpixel.lib` in `src/`.
+Produces `winpixel.dll` and `winpixel.lib` in `lib/`.
 
 ## Usage
 
@@ -28,7 +28,7 @@ Produces `winpixel.dll` and `winpixel.lib` in `src/`.
 Compile and link against the DLL:
 
 ```sh
-clang your_program.c -o your_program.exe -I path/to/src -L path/to/src -lwinpixel
+clang your_program.c -o your_program.exe -I path/to/src -L path/to/lib -lwinpixel
 ```
 
 Make sure `winpixel.dll` is next to the executable (or on `PATH`) at runtime.
@@ -52,13 +52,14 @@ int main() {
 
 ## Features
 
-- **Draw** — pixels, lines, rectangles, circles, ellipses, triangles, Bezier curves, splines
-- **Sprites** — load PNG/BMP via stb_image, draw with scale, flip, or sub-region
-- **Text** — built-in 6×6 bitmap font, printf-style formatting
-- **Input** — keyboard (VK_* codes) and mouse (position, buttons, wheel) with press/down/up states
-- **Math** — lerp, map, clamp, wrap, noise (1D Perlin), distance, direction, color interpolation
+- **Draw** — pixels, lines (solid, dashed, gap), rectangles, circles, ellipses, triangles, Bezier curves, thick splines; screen-door `_grid` variants for 50% transparency
+- **Sprites** — load PNG via stb_image; draw with scale, flip, sub-region; save sprite or screenshot to PNG
+- **Text** — built-in 6×6 bitmap font, printf-style, shadow, scale, measure
+- **Input** — keyboard (`VK_*`) and mouse (position, left/right/wheel, press/down/up states)
+- **Math** — lerp, map, clamp, wrap, noise (1D Perlin), distance, direction, color interpolation, line intersection
 - **Time** — FPS counter and delta time via `QueryPerformanceCounter`
-- **Colors** — 30+ named constants (`RED`, `BLUE`, `BLUEPRINT`, …), `Color32` (hex), `Colorf` (float)
+- **Colors** — 30+ named constants (`RED`, `BLUE`, `BLUEPRINT`, …), `Color32` (hex RGBA), `Colorf` (float)
+- **TimeGraph** — `wpx_timegraph` ring-buffer graph widget for real-time metrics
 
 ## Examples
 
@@ -76,8 +77,16 @@ cd examples && make
 |---------|-------------|
 | `template.exe` | Minimal starting point |
 | `triangle.exe` | Rotating triangle with mouse interaction and zoom |
-| `sprite.exe` | Sprite loading and drawing |
+| `sprite.exe` | Sprite loading and sub-region drawing (spritesheet) |
 | `trails.exe` | Mouse trail effect with color interpolation |
+| `noise.exe` | Scrolling terrain heightmap with Perlin noise and biome colors |
+| `primitives.exe` | Gallery of all drawing primitives with labels |
+| `bezier.exe` | Interactive Bezier curve editor (quadratic / cubic, draggable control points) |
+| `paint.exe` | Mini paint app — draw, erase, color picker, screenshot |
+| `clock.exe` | Analog clock reading system time with smooth hands |
+| `timegraph.exe` | Live waveform display using `wpx_timegraph` (FPS, sin, Perlin noise) |
+| `cube.exe` | Flat-shaded dithered cube with mouse-wheel zoom |
+| `bunny.exe` | Stanford bunny — flat dither, dynamic mouse light, palette cycling |
 
 ## License
 

@@ -67,34 +67,33 @@ float WINPIXELCALL map (
 /* loop: (value > max) = min, (value < min) = max */
 float WINPIXELCALL wrap (float value, float min, float max) {
 
-	float result = value - (max - min)*floorf((value - min)/(max - min));
-
-	return result;
+	return value - (max - min) * floorf((value - min) / (max - min));
 }
 
 float WINPIXELCALL clamp (float x, float lower, float upper) {
 
-	return __min(upper, __max(x, lower));
+	return fminf(upper, fmaxf(x, lower));
 }
 
 float WINPIXELCALL distance_point (float x, float y, float x2, float y2) {
 
-	return sqrtf(powf(x2 - x, 2) + powf(y2 - y, 2));
+	float dx = x2 - x, dy = y2 - y;
+	return sqrtf(dx*dx + dy*dy);
 }
 
 float WINPIXELCALL direction_point (float x, float y, float x2, float y2) {
 
 	float dir = -atan2f((y2 - y), (x2 - x)) * (180.0f / M_PI);
-	if (dir <   0.000000f) dir += 360.000000f;
-	if (dir > 360.000000f) dir  =   0.000000f;
-	return fabsf(dir);
+	if (dir <   0.0f) dir += 360.0f;
+	if (dir > 360.0f) dir  =   0.0f;
+	return dir;
 }
 
 int WINPIXELCALL isprime (int number) {
 
 	if (number <= 1 || (number % 2 == 0 && number > 2))
 		return 0;
-	for (int i = 3; i < number / 2; i+= 2)
+	for (int i = 3; i * i <= number; i += 2)
 		if (number % i == 0)
 			return 0;
 	return 1;
@@ -133,58 +132,33 @@ void WINPIXELCALL int_shuffle (int *array, int size) {
 
 int WINPIXELCALL line_in_point (rectf line, vec2f point, float tolerance) {
 
-	return (fabsf(
-			 distance_point(line.x, line.y,  line.w,  line.h) -
-			(distance_point(line.x, line.y, point.x, point.y) +
-			 distance_point(line.w, line.h, point.x, point.y))) <=
-			fmaxf(tolerance, 0.01f));
+	/* Project point onto segment, clamp to [0,1], compare squared distances. */
+	float ax = line.w - line.x, ay = line.h - line.y;
+	float px = point.x - line.x, py = point.y - line.y;
+	float len2 = ax*ax + ay*ay;
+	float t = (len2 > 0.0f) ? (px*ax + py*ay) / len2 : 0.0f;
+	if (t < 0.0f) t = 0.0f;
+	if (t > 1.0f) t = 1.0f;
+	float dx = px - t*ax, dy = py - t*ay;
+	float tol = fmaxf(tolerance, 0.01f);
+	return dx*dx + dy*dy <= tol*tol;
 }
 
 int WINPIXELCALL line_in_line (rectf line1, rectf line2) {
 
-	float s1_x = (line1.w - line1.x);
-	float s1_y = (line1.h - line1.y);
-	float s2_x = (line2.w - line2.x);
-	float s2_y = (line2.h - line2.y);
-	float s = (-s1_y * (line1.x - line2.x) + s1_x *(line1.y - line2.y)) /
-		(-s2_x * s1_y + s1_x * s2_y);
-	float t = (s2_x * (line1.y - line2.y) - s2_y * (line1.x - line2.x)) /
-		(-s2_x * s1_y + s1_x * s2_y);
-	return s >= 0 && s <= 1 && t >= 0 && t <= 1;
+	float s1_x = line1.w - line1.x, s1_y = line1.h - line1.y;
+	float s2_x = line2.w - line2.x, s2_y = line2.h - line2.y;
+	float denom = -s2_x * s1_y + s1_x * s2_y;
+	if (denom == 0.0f) return 0;
+	float s = (-s1_y * (line1.x - line2.x) + s1_x * (line1.y - line2.y)) / denom;
+	float t = ( s2_x * (line1.y - line2.y) - s2_y * (line1.x - line2.x)) / denom;
+	return s >= 0.0f && s <= 1.0f && t >= 0.0f && t <= 1.0f;
 }
 
 /* Returns the midpoint between two points */
 vec2f WINPIXELCALL middle_line (float x, float y, float x2, float y2) {
 
 	return (vec2f) {(x + x2) / 2.0f, (y + y2) / 2.0f};
-}
-
-int32_t WINPIXELCALL sqrt_int (int32_t value) {
-
-	int8_t sign = 1;
-
-	if (value < 0) {
-		sign   = -1;
-		value *= -1;
-	}
-
-	uint32_t result = 0;
-	uint32_t a      = value;
-	uint32_t b      = 1u << 30;
-
-	while (b > a)
-		b >>= 2;
-
-	while (b != 0) {
-		if (a >= result + b) {
-			a -= result + b;
-			result = result +  2 * b;
-		}
-		b      >>= 2;
-		result >>= 1;
-	}
-
-	return result * sign;
 }
 
 void WINPIXELCALL noise_generator (Noisegen *gen, float increment) {

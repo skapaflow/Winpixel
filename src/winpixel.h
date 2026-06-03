@@ -214,16 +214,31 @@ typedef struct {
 extern WINPIXELDLL bool wpx_quit;
 extern WINPIXELDLL int  WPX_W, WPX_H;
 extern WINPIXELDLL int  WPX_W2, WPX_H2;
+extern WINPIXELDLL int  WPX_SW, WPX_SH;   /* physical client-area size in pixels */
+extern WINPIXELDLL int  WPX_SW2, WPX_SH2; /* half of physical client-area size */
 // -------------------------
 // Window
 // -------------------------
-WINPIXELDLL int  WINPIXELCALL winpixel_window (const char *title, int w, int h, bool logo); /* logo=true prints ASCII banner */
-WINPIXELDLL void WINPIXELCALL winpixel_maximize (void);
-WINPIXELDLL bool WINPIXELCALL winpixel_poll_events (void);
-WINPIXELDLL void WINPIXELCALL winpixel_render (Color32 background, int delay); /* present + clear + sleep(delay ms) */
-WINPIXELDLL void WINPIXELCALL winpixel_present (void);                         /* blit framebuffer, update time/input */
-WINPIXELDLL HWND WINPIXELCALL winpixel_get_hwnd (void);
-WINPIXELDLL HDC  WINPIXELCALL winpixel_get_hdc (void);                         /* caller must ReleaseDC when done */
+WINPIXELDLL int       WINPIXELCALL winpixel_window (const char *title, int w, int h, bool logo); /* logo=true prints ASCII banner */
+WINPIXELDLL void      WINPIXELCALL winpixel_maximize (void);
+WINPIXELDLL void      WINPIXELCALL wpx_fullscreen (void);   /* toggle borderless fullscreen */
+WINPIXELDLL bool      WINPIXELCALL winpixel_poll_events (void);
+WINPIXELDLL void      WINPIXELCALL winpixel_render (Color32 background, int delay); /* present + clear + sleep(delay ms) */
+WINPIXELDLL void      WINPIXELCALL winpixel_present (void);                         /* blit framebuffer, update time/input */
+WINPIXELDLL HWND      WINPIXELCALL winpixel_get_hwnd (void);
+WINPIXELDLL HDC       WINPIXELCALL winpixel_get_hdc (void);                         /* caller must ReleaseDC when done */
+WINPIXELDLL void      WINPIXELCALL wpx_screen_resolution (int w, int h, bool stretch); /* set logical draw resolution; stretch=false adds black bars */
+WINPIXELDLL void      WINPIXELCALL wpx_mouse_hide (void);
+WINPIXELDLL void      WINPIXELCALL wpx_mouse_show (void);
+WINPIXELDLL void      WINPIXELCALL wpx_mouse_pos  (int x, int y);                   /* move cursor to logical coordinates */
+WINPIXELDLL uint32_t *WINPIXELCALL wpx_get_buffer (void);                           /* raw framebuffer [WPX_W * WPX_H]; use wpx_color_buf() to convert colors */
+WINPIXELDLL void     *WINPIXELCALL wpx_get_internal (void);                         /* debug only */
+/* converts Color32 (0xRRGGBBAA) to the framebuffer's internal pixel format (0x00RRGGBB) */
+static inline uint32_t wpx_color_buf (Color32 color) {
+    return ((color >> 24) & 0xFF) << 16 |
+           ((color >> 16) & 0xFF) <<  8 |
+           ((color >>  8) & 0xFF);
+}
 // -------------------------
 // Input - constants
 // -------------------------
@@ -233,6 +248,7 @@ WINPIXELDLL HDC  WINPIXELCALL winpixel_get_hdc (void);                         /
 // Input - state (read-only)
 // -------------------------
 extern WINPIXELDLL vec2f  wpx_mouse;
+extern WINPIXELDLL vec2f  wpx_smouse; /* mouse in physical screen coordinates (WPX_SW/SH space) */
 extern WINPIXELDLL int8_t wpx_mouse_wheel;         /* return (-1,0,1) */
 extern WINPIXELDLL bool   wpx_mouse_wheel_down;
 extern WINPIXELDLL bool   wpx_mouse_wheel_press;
@@ -281,10 +297,21 @@ WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_ex (vec2f *triangle, float x, fl
 WINPIXELDLL void WINPIXELCALL wpx_ellipse (int x, int y, int radius_x, int radius_y, Color32 color);
 WINPIXELDLL void WINPIXELCALL wpx_bezier_thick (vec2f startPos, vec2f endPos, float thick, Color32 color); /* cubic bezier, no control points */
 WINPIXELDLL void WINPIXELCALL wpx_spline (float px, float py, float pw, float ph, float thick, Color32 color); /* thick line segment */
+WINPIXELDLL void WINPIXELCALL wpx_spline_grid (float px, float py, float pw, float ph, float thick, Color32 color); /* thick line segment */
 WINPIXELDLL void WINPIXELCALL wpx_spline_gap (int x, int y, int w, int h, float thick, Color32 color);
 WINPIXELDLL void WINPIXELCALL wpx_spline_dashed (int x, int y, int w, int h, float thick, float dash, Color32 color);
 WINPIXELDLL void WINPIXELCALL wpx_spline_bezier_quadratic (const vec2f *points, int pointCount, float thick, Color32 color); /* [p1,c2,p3,c4,...] min 3 pts */
 WINPIXELDLL void WINPIXELCALL wpx_spline_bezier_cubic (const vec2f *points, int pointCount, float thick, Color32 color);    /* [p1,c2,c3,p4,...] min 4 pts */
+// -------------------------
+// TimeGraph - public API
+// -------------------------
+#define WPX_TGRAPH_CAP 512
+typedef struct {
+    float buf[WPX_TGRAPH_CAP];
+    int   head;
+    int   len;
+} WPX_TimeGraph;
+WINPIXELDLL void WINPIXELCALL wpx_timegraph (WPX_TimeGraph *g, float value, int x, int y, int w, int h, Color32 color); /* value must be normalized [0,1] */
 // -------------------------
 // Print - public API
 // -------------------------
@@ -337,7 +364,6 @@ WINPIXELDLL void WINPIXELCALL int_shuffle (int *array, int size);
 WINPIXELDLL int WINPIXELCALL line_in_point (rectf line, vec2f point, float tolerance);
 WINPIXELDLL int WINPIXELCALL line_in_line (rectf line1, rectf line2);
 WINPIXELDLL vec2f WINPIXELCALL middle_line (float x, float y, float x2, float y2);
-WINPIXELDLL int32_t WINPIXELCALL sqrt_int (int32_t value);                 /* integer square root, no FPU */
 WINPIXELDLL void WINPIXELCALL noise_generator (Noisegen *gen, float increment); /* init; call before noise() */
 WINPIXELDLL float WINPIXELCALL noise (Noisegen *gen);                      /* 1D Perlin noise, output in [-0.5, +0.5] */
 WINPIXELDLL void WINPIXELCALL noise_reset (Noisegen *gen);                 /* resets position to 0 */

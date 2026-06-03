@@ -15,6 +15,7 @@ bool    wpx_keys_press[WPX_MAX_KEYS]             = {false};
 bool    wpx_keys_up[WPX_MAX_KEYS]                = {false};
 bool    wpx_mouse_buttons[WPX_MAX_MOUSE_BUTTONS] = {false};
 vec2f   wpx_mouse                                = {0.0f, 0.0f};
+vec2f   wpx_smouse                               = {0.0f, 0.0f};
 
 int8_t  wpx_mouse_wheel       = 0;
 bool    wpx_mouse_wheel_down  = false;

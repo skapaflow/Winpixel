@@ -2,13 +2,6 @@
 
 #include <math.h>
 
-// Converts Color32 (0xRRGGBBAA) to GDI 32bpp BI_RGB format (0x00RRGGBB)
-static inline Color32 wpx_color_to_pixel (Color32 color) {
-    Color32 r = (color >> 24) & 0xFF;
-    Color32 g = (color >> 16) & 0xFF;
-    Color32 b = (color >>  8) & 0xFF;
-    return (r << 16) | (g << 8) | b;
-}
 
 WINPIXELDLL Color32 WINPIXELCALL rgba_to_hex (int r, int g, int b, int a) {
 
@@ -62,22 +55,63 @@ WINPIXELDLL Color32 WINPIXELCALL wpx_getpixel (int x, int y) {
     return ((Color32)r << 24) | ((Color32)g << 16) | ((Color32)b << 8) | 0xFF;
 }
 
+/* Fills a horizontal span directly into the framebuffer; clips and skips out-of-bounds rows. */
+static inline void _span_fill(int x0, int x1, int y, Color32 px) {
+    if (y < 0 || y >= wpx_render.h) return;
+    if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
+    if (x0 >= wpx_render.w || x1 < 0) return;
+    if (x0 < 0) x0 = 0;
+    if (x1 >= wpx_render.w) x1 = wpx_render.w - 1;
+    Color32 *row = wpx_render.buffer_screen + y * wpx_render.w;
+    for (int x = x0; x <= x1; x++) row[x] = px;
+}
+
+/* Same but screen-door: only pixels where (x+y) is odd (checkerboard 50% transparency). */
+static inline void _span_fill_grid(int x0, int x1, int y, Color32 px) {
+    if (y < 0 || y >= wpx_render.h) return;
+    if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
+    if (x0 >= wpx_render.w || x1 < 0) return;
+    if (x0 < 0) x0 = 0;
+    if (x1 >= wpx_render.w) x1 = wpx_render.w - 1;
+    if (!((x0 + y) & 1)) x0++;
+    Color32 *row = wpx_render.buffer_screen + y * wpx_render.w;
+    for (int x = x0; x <= x1; x += 2) row[x] = px;
+}
+
 WINPIXELDLL void WINPIXELCALL wpx_line (int x0, int y0, int x1, int y1, Color32 color) {
-    int dx  =  abs(x1 - x0);
-    int dy  =  abs(y1 - y0);
-    int sx  = (x0 < x1) ? 1 : -1;
-    int sy  = (y0 < y1) ? 1 : -1;
-    int err = dx - dy;
+
+    /* Cohen-Sutherland: clip line to screen bounds, then Bresenham without per-pixel bounds check. */
+    #define _CS(x, y) \
+        (((x) < 0) | (((x) >= wpx_render.w) << 1) | (((y) < 0) << 2) | (((y) >= wpx_render.h) << 3))
+
+    int c0 = _CS(x0, y0), c1 = _CS(x1, y1);
+    while (c0 | c1) {
+        if (c0 & c1) return;
+        int c = c0 ? c0 : c1, cx, cy;
+        int dx = x1 - x0, dy = y1 - y0;
+        if      (c & 8) { cy = wpx_render.h - 1; cx = x0 + dx * (cy - y0) / dy; }
+        else if (c & 4) { cy = 0;                cx = x0 + dx * (cy - y0) / dy; }
+        else if (c & 2) { cx = wpx_render.w - 1; cy = y0 + dy * (cx - x0) / dx; }
+        else            { cx = 0;                cy = y0 + dy * (cx - x0) / dx; }
+        if (c == c0) { x0 = cx; y0 = cy; c0 = _CS(x0, y0); }
+        else         { x1 = cx; y1 = cy; c1 = _CS(x1, y1); }
+    }
+    #undef _CS
+
+    Color32 px  = wpx_color_to_pixel(color);
+    int dx      = abs(x1 - x0);
+    int dy      = abs(y1 - y0);
+    int sx      = (x0 < x1) ? 1 : -1;
+    int sy      = (y0 < y1) ? wpx_render.w : -wpx_render.w;
+    int err     = dx - dy;
+    Color32 *buf = wpx_render.buffer_screen + y0 * wpx_render.w + x0;
 
     while (1) {
-        wpx_pixel(x0, y0, color);
-
-        if (x0 == x1 && y0 == y1)
-            break;
-
+        *buf = px;
+        if (x0 == x1 && y0 == y1) break;
         int e2 = 2 * err;
-        if (e2 > -dy) { err -= dy; x0 += sx; }
-        if (e2 <  dx) { err += dx; y0 += sy; }
+        if (e2 > -dy) { err -= dy; x0 += sx; buf += sx; }
+        if (e2 <  dx) { err += dx; y0 += (sy > 0 ? 1 : -1); buf += sy; }
     }
 }
 
@@ -132,28 +166,20 @@ void WINPIXELCALL wpx_rect_center (int x, int y, int w, int h, Color32 color) {
 
 void WINPIXELCALL wpx_rect_fill (int x, int y, int w, int h, Color32 color) {
 
-	// Ajusta x e y de acordo com a direção de w e h
-	if (w < 0) {
-		x += w;
-		w = -w;
-	}
-	if (h < 0) {
-		y += h;
-		h = -h;
-	}
-	int y_end = y + h;
-	for (int current_y = y; current_y < y_end; current_y++)
-		wpx_line(x, current_y, x + w, current_y, color);
+	if (w < 0) { x += w; w = -w; }
+	if (h < 0) { y += h; h = -h; }
+	Color32 px = wpx_color_to_pixel(color);
+	for (int j = y; j < y + h; j++)
+		_span_fill(x, x + w, j, px);
 }
 
 void WINPIXELCALL wpx_rect_fill_grid (int x, int y, int w, int h, Color32 color) {
 
 	if (w < 0) { x += w; w = -w; }
 	if (h < 0) { y += h; h = -h; }
-	int y_end = y + h;
-	for (int cy = y; cy < y_end; cy++)
-		for (int cx = x; cx < x + w; cx++)
-			if ((cx + cy) & 1) wpx_pixel(cx, cy, color);
+	Color32 px = wpx_color_to_pixel(color);
+	for (int j = y; j < y + h; j++)
+		_span_fill_grid(x, x + w - 1, j, px);
 }
 
 void WINPIXELCALL wpx_circle (int x0, int y0, int radius, Color32 color) {
@@ -190,496 +216,98 @@ void WINPIXELCALL wpx_circle (int x0, int y0, int radius, Color32 color) {
 
 WINPIXELDLL void WINPIXELCALL wpx_circle_fill (int xc, int yc, int radius, Color32 col) {
 
-    #define _DRAWLINE(sx,ex,ny)\
-        {for (int i = (sx); i <= (ex); i++) {wpx_pixel(i, (ny), col);}}
-
-    int x = 0;
-    int y = radius;
-    int p = 3 - 2 * radius;
-
-    if (!radius)
-        return;
+    if (!radius) return;
+    Color32 px = wpx_color_to_pixel(col);
+    int x = 0, y = radius, p = 3 - 2 * radius;
 
     while (y >= x) {
-        _DRAWLINE(xc - x, xc + x, yc - y);
-        _DRAWLINE(xc - y, xc + y, yc - x);
-        _DRAWLINE(xc - x, xc + x, yc + y);
-        _DRAWLINE(xc - y, xc + y, yc + x);
+        _span_fill(xc - x, xc + x, yc - y, px);
+        _span_fill(xc - y, xc + y, yc - x, px);
+        _span_fill(xc - x, xc + x, yc + y, px);
+        _span_fill(xc - y, xc + y, yc + x, px);
         if (p < 0)
             p += 4 * x++ + 6;
         else
             p += 4 * (x++ - y--) + 10;
     }
-
-    #undef _DRAWLINE
 }
 
-void WINPIXELCALL wpx_triangle_fill (vec2i *triangle, Color32 col) {
+WINPIXELDLL void WINPIXELCALL wpx_triangle_fill(vec2i *triangle, Color32 col) {
+    Color32 px = wpx_color_to_pixel(col);
 
-	#define _swap(x,y) {int t = x; x = y; y = t;};
-    #define _DRAWLINE(sx,ex,ny)\
-        {for (int i = (sx); i <= (ex); i++) {wpx_pixel(i, (ny), col);}}
+    vec2i v[3] = { triangle[0], triangle[1], triangle[2] };
+    if (v[0].y > v[1].y) { vec2i t = v[0]; v[0] = v[1]; v[1] = t; }
+    if (v[0].y > v[2].y) { vec2i t = v[0]; v[0] = v[2]; v[2] = t; }
+    if (v[1].y > v[2].y) { vec2i t = v[1]; v[1] = v[2]; v[2] = t; }
 
-	int t1x, t2x, y, minx, maxx, t1xp, t2xp;
-	int changed1 = 0;
-	int changed2 = 0;
-	int signx1, signx2, dx1, dy1, dx2, dy2;
-	int e1, e2;
+    int y0 = v[0].y, y1 = v[1].y, y2 = v[2].y;
+    if (y0 == y2) return;
 
-	/* sort vertices */
-	if (triangle[0].y > triangle[1].y) {_swap(triangle[0].y, triangle[1].y); _swap(triangle[0].x, triangle[1].x);}
-	if (triangle[0].y > triangle[2].y) {_swap(triangle[0].y, triangle[2].y); _swap(triangle[0].x, triangle[2].x);}
-	if (triangle[1].y > triangle[2].y) {_swap(triangle[1].y, triangle[2].y); _swap(triangle[1].x, triangle[2].x);}
+    float slope02 = (float)(v[2].x - v[0].x) / (float)(y2 - y0);
 
-	/* starting points */
-	t1x = t2x = triangle[0].x; y = triangle[0].y; 
-	dx1 = (int) (triangle[1].x - triangle[0].x);
+    if (y0 < y1) {
+        float slope01 = (float)(v[1].x - v[0].x) / (float)(y1 - y0);
+        float xa = (float)v[0].x, xb = (float)v[0].x;
+        for (int y = y0; y < y1; y++, xa += slope02, xb += slope01)
+            _span_fill((int)xa, (int)xb, y, px);
+    }
 
-	if (dx1 < 0) {
-		dx1 = -dx1;
-		signx1 = -1;
-	} else
-		signx1 = 1;
-
-	dy1 = (int) (triangle[1].y - triangle[0].y);
-	dx2 = (int) (triangle[2].x - triangle[0].x);
-
-	if (dx2 < 0) {
-		dx2 = -dx2;
-		signx2 = -1;
-	} else
-		signx2 = 1;
-
-	dy2 = (int) (triangle[2].y - triangle[0].y);
-
-	/* _swap values */
-	if (dy1 > dx1) {
-		_swap(dx1, dy1);
-		changed1 = 1;
-	}
-
-	/* _swap values */
-	if (dy2 > dx2) {
-		_swap(dy2, dx2);
-		changed2 = 1;
-	}
-
-	e2 = (int) (dx2 >> 1);
-
-	/* flat top, just process the second half */
-	if (triangle[0].y == triangle[1].y)
-		goto next;
-
-	e1 = (int) (dx1 >> 1);
-
-	for (int i = 0; i < dx1;) {
-		t1xp = 0; t2xp = 0;
-		if (t1x < t2x) {
-			minx = t1x;
-			maxx = t2x;
-		} else {
-			minx = t2x;
-			maxx = t1x;
-		}
-		/* process first line until y value is about to change */
-		while (i < dx1) {
-			i++;
-			e1 += dy1;
-			while (e1 >= dx1) {
-				e1 -= dx1;
-				if (changed1)
-					t1xp = signx1;//t1x += signx1;
-				else
-					goto next1;
-			}
-			if (changed1)
-				break;
-			else
-				t1x += signx1;
-		}
-		/* Move line */
-
-	next1:
-
-		/* process second line until y value is about to change */
-		while (1) {
-			e2 += dy2;
-			while (e2 >= dx2) {
-				e2 -= dx2;
-				if (changed2)
-					t2xp = signx2;//t2x += signx2;
-				else
-					goto next2;
-			}
-			if (changed2)
-				break;
-			else
-				t2x += signx2;
-		}
-
-	next2:
-
-		if (minx > t1x) minx = t1x;
-		if (minx > t2x) minx = t2x;
-		if (maxx < t1x) maxx = t1x;
-		if (maxx < t2x) maxx = t2x;
-
-		/* Draw line from min to max 
-		 * points found on the y
-		 * Now increase y
-		 */
-		_DRAWLINE(minx, maxx, y);
-
-		if (!changed1)
-			t1x += signx1;
-		t1x += t1xp;
-		if (!changed2)
-			t2x += signx2;
-		t2x += t2xp;
-		y += 1;
-		if (y == triangle[1].y)
-			break;
-	}
-
-next:
-
-	/* second half */
-	dx1 = (int) (triangle[2].x - triangle[1].x);
-
-	if (dx1<0) {
-		dx1 = -dx1;
-		signx1 = -1;
-	} else
-		signx1 = 1;
-
-	dy1 = (int) (triangle[2].y - triangle[1].y);
-	t1x = triangle[1].x;
-
-	if (dy1 > dx1) { /* _swap values */
-		_swap(dy1, dx1);
-		changed1 = 1;
-	} else
-		changed1 = 0;
-
-	e1 = (int) (dx1 >> 1);
-
-	for (int i = 0; i <= dx1; i++) {
-		t1xp = 0; t2xp = 0;
-		if (t1x < t2x) {
-			minx = t1x;
-			maxx = t2x;
-		} else {
-			minx = t2x;
-			maxx = t1x;
-		}
-		/* process first line until y value is about to change */
-		while (i < dx1) {
-			e1 += dy1;
-			while (e1 >= dx1) {
-				e1 -= dx1;
-				if (changed1) {
-					t1xp = signx1;
-					break;
-					//t1x += signx1;
-				} else
-					goto next3;
-			}
-			if (changed1)
-				break;
-			else
-				t1x += signx1;
-			if (i < dx1)
-				i++;
-		}
-
-	next3:
-
-		/* process second line until y value is about to change */
-		while (t2x != triangle[2].x) {
-			e2 += dy2;
-			while (e2 >= dx2) {
-				e2 -= dx2;
-				if (changed2)
-					t2xp = signx2;
-				else
-					goto next4;
-			}
-			if (changed2)
-				break;
-			else
-				t2x += signx2;
-		}
-
-	next4:
-
-		if (minx > t1x) minx = t1x;
-		if (minx > t2x) minx = t2x;
-		if (maxx < t1x) maxx = t1x;
-		if (maxx < t2x) maxx = t2x;
-
-		_DRAWLINE(minx, maxx, y);
-
-		if (!changed1)
-			t1x += signx1;
-		t1x += t1xp;
-		if (!changed2)
-			t2x += signx2;
-		t2x += t2xp;
-		y += 1;
-		if (y > triangle[2].y)
-			return;
-	}
-
-	#undef _swap
-	#undef _DRAWLINE
+    if (y1 < y2) {
+        float slope12 = (float)(v[2].x - v[1].x) / (float)(y2 - y1);
+        float xa = (float)v[0].x + slope02 * (float)(y1 - y0);
+        float xb = (float)v[1].x;
+        for (int y = y1; y <= y2; y++, xa += slope02, xb += slope12)
+            _span_fill((int)xa, (int)xb, y, px);
+    }
 }
 
 /* DEFINITION: SCREEN-DOOR TRANSPARENCY, ORDERED DITHERING */
 WINPIXELDLL void WINPIXELCALL wpx_circle_fill_grid (int xc, int yc, int radius, Color32 col) {
 
-    #define _DRAWLINE_GRID(sx,ex,ny)\
-        {for (int i = (sx); i <= (ex); i++) { if (((i) + (ny)) & 1) wpx_pixel(i, (ny), col); }}
-
-    int x = 0;
-    int y = radius;
-    int p = 3 - 2 * radius;
-
-    if (!radius)
-        return;
+    if (!radius) return;
+    Color32 px = wpx_color_to_pixel(col);
+    int x = 0, y = radius, p = 3 - 2 * radius;
 
     while (y >= x) {
-        _DRAWLINE_GRID(xc - x, xc + x, yc - y);
-        _DRAWLINE_GRID(xc - y, xc + y, yc - x);
-        _DRAWLINE_GRID(xc - x, xc + x, yc + y);
-        _DRAWLINE_GRID(xc - y, xc + y, yc + x);
+        _span_fill_grid(xc - x, xc + x, yc - y, px);
+        _span_fill_grid(xc - y, xc + y, yc - x, px);
+        _span_fill_grid(xc - x, xc + x, yc + y, px);
+        _span_fill_grid(xc - y, xc + y, yc + x, px);
         if (p < 0)
             p += 4 * x++ + 6;
         else
             p += 4 * (x++ - y--) + 10;
     }
-
-    #undef _DRAWLINE_GRID
 }
 
 /* DEFINITION: SCREEN-DOOR TRANSPARENCY, ORDERED DITHERING */
-void WINPIXELCALL wpx_triangle_fill_grid (vec2i *triangle, Color32 col) {
+WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_grid(vec2i *triangle, Color32 col) {
+    Color32 px = wpx_color_to_pixel(col);
 
-	#define _swap(x,y) {int t = x; x = y; y = t;}
-    
-    /* The screen-door effect: sum X (i) and Y (ny); draw pixel only when odd (bit 0 set).
-     * Even positions are skipped, producing the classic 90s 50% transparency pattern. */
-    #define _DRAWLINE_GRID(sx,ex,ny)\
-        {for (int i = (sx); i <= (ex); i++) { if (((i) + (ny)) & 1) wpx_pixel(i, (ny), col); }}
+    vec2i v[3] = { triangle[0], triangle[1], triangle[2] };
+    if (v[0].y > v[1].y) { vec2i t = v[0]; v[0] = v[1]; v[1] = t; }
+    if (v[0].y > v[2].y) { vec2i t = v[0]; v[0] = v[2]; v[2] = t; }
+    if (v[1].y > v[2].y) { vec2i t = v[1]; v[1] = v[2]; v[2] = t; }
 
-	int t1x, t2x, y, minx, maxx, t1xp, t2xp;
-	int changed1 = 0;
-	int changed2 = 0;
-	int signx1, signx2, dx1, dy1, dx2, dy2;
-	int e1, e2;
+    int y0 = v[0].y, y1 = v[1].y, y2 = v[2].y;
+    if (y0 == y2) return;
 
-	/* sort vertices */
-	if (triangle[0].y > triangle[1].y) {_swap(triangle[0].y, triangle[1].y); _swap(triangle[0].x, triangle[1].x);}
-	if (triangle[0].y > triangle[2].y) {_swap(triangle[0].y, triangle[2].y); _swap(triangle[0].x, triangle[2].x);}
-	if (triangle[1].y > triangle[2].y) {_swap(triangle[1].y, triangle[2].y); _swap(triangle[1].x, triangle[2].x);}
+    float slope02 = (float)(v[2].x - v[0].x) / (float)(y2 - y0);
 
-	/* starting points */
-	t1x = t2x = triangle[0].x; y = triangle[0].y; 
-	dx1 = (int) (triangle[1].x - triangle[0].x);
+    if (y0 < y1) {
+        float slope01 = (float)(v[1].x - v[0].x) / (float)(y1 - y0);
+        float xa = (float)v[0].x, xb = (float)v[0].x;
+        for (int y = y0; y < y1; y++, xa += slope02, xb += slope01)
+            _span_fill_grid((int)xa, (int)xb, y, px);
+    }
 
-	if (dx1 < 0) {
-		dx1 = -dx1;
-		signx1 = -1;
-	} else
-		signx1 = 1;
-
-	dy1 = (int) (triangle[1].y - triangle[0].y);
-	dx2 = (int) (triangle[2].x - triangle[0].x);
-
-	if (dx2 < 0) {
-		dx2 = -dx2;
-		signx2 = -1;
-	} else
-		signx2 = 1;
-
-	dy2 = (int) (triangle[2].y - triangle[0].y);
-
-	/* _swap values */
-	if (dy1 > dx1) {
-		_swap(dx1, dy1);
-		changed1 = 1;
-	}
-
-	/* _swap values */
-	if (dy2 > dx2) {
-		_swap(dy2, dx2);
-		changed2 = 1;
-	}
-
-	e2 = (int) (dx2 >> 1);
-
-	/* flat top, just process the second half */
-	if (triangle[0].y == triangle[1].y)
-		goto next;
-
-	e1 = (int) (dx1 >> 1);
-
-	for (int i = 0; i < dx1;) {
-		t1xp = 0; t2xp = 0;
-		if (t1x < t2x) {
-			minx = t1x;
-			maxx = t2x;
-		} else {
-			minx = t2x;
-			maxx = t1x;
-		}
-		/* process first line until y value is about to change */
-		while (i < dx1) {
-			i++;
-			e1 += dy1;
-			while (e1 >= dx1) {
-				e1 -= dx1;
-				if (changed1)
-					t1xp = signx1;
-				else
-					goto next1;
-			}
-			if (changed1)
-				break;
-			else
-				t1x += signx1;
-		}
-
-	next1:
-
-		/* process second line until y value is about to change */
-		while (1) {
-			e2 += dy2;
-			while (e2 >= dx2) {
-				e2 -= dx2;
-				if (changed2)
-					t2xp = signx2;
-				else
-					goto next2;
-			}
-			if (changed2)
-				break;
-			else
-				t2x += signx2;
-		}
-
-	next2:
-
-		if (minx > t1x) minx = t1x;
-		if (minx > t2x) minx = t2x;
-		if (maxx < t1x) maxx = t1x;
-		if (maxx < t2x) maxx = t2x;
-
-		/* Substituído para a chamada com a grade 50% */
-		_DRAWLINE_GRID(minx, maxx, y);
-
-		if (!changed1)
-			t1x += signx1;
-		t1x += t1xp;
-		if (!changed2)
-			t2x += signx2;
-		t2x += t2xp;
-		y += 1;
-		if (y == triangle[1].y)
-			break;
-	}
-
-next:
-
-	/* second half */
-	dx1 = (int) (triangle[2].x - triangle[1].x);
-
-	if (dx1<0) {
-		dx1 = -dx1;
-		signx1 = -1;
-	} else
-		signx1 = 1;
-
-	dy1 = (int) (triangle[2].y - triangle[1].y);
-	t1x = triangle[1].x;
-
-	if (dy1 > dx1) { 
-		_swap(dy1, dx1);
-		changed1 = 1;
-	} else
-		changed1 = 0;
-
-	e1 = (int) (dx1 >> 1);
-
-	for (int i = 0; i <= dx1; i++) {
-		t1xp = 0; t2xp = 0;
-		if (t1x < t2x) {
-			minx = t1x;
-			maxx = t2x;
-		} else {
-			minx = t2x;
-			maxx = t1x;
-		}
-		
-		/* process first line until y value is about to change */
-		while (i < dx1) {
-			e1 += dy1;
-			while (e1 >= dx1) {
-				e1 -= dx1;
-				if (changed1) {
-					t1xp = signx1;
-					break;
-				} else
-					goto next3;
-			}
-			if (changed1)
-				break;
-			else
-				t1x += signx1;
-			if (i < dx1)
-				i++;
-		}
-
-	next3:
-
-		/* process second line until y value is about to change */
-		while (t2x != triangle[2].x) {
-			e2 += dy2;
-			while (e2 >= dx2) {
-				e2 -= dx2;
-				if (changed2)
-					t2xp = signx2;
-				else
-					goto next4;
-			}
-			if (changed2)
-				break;
-			else
-				t2x += signx2;
-		}
-
-	next4:
-
-		if (minx > t1x) minx = t1x;
-		if (minx > t2x) minx = t2x;
-		if (maxx < t1x) maxx = t1x;
-		if (maxx < t2x) maxx = t2x;
-
-        /* Substituído para a chamada com a grade 50% */
-		_DRAWLINE_GRID(minx, maxx, y);
-
-		if (!changed1)
-			t1x += signx1;
-		t1x += t1xp;
-		if (!changed2)
-			t2x += signx2;
-		t2x += t2xp;
-		y += 1;
-		if (y > triangle[2].y)
-			return;
-	}
-
-	#undef _swap
-	#undef _DRAWLINE_GRID
+    if (y1 < y2) {
+        float slope12 = (float)(v[2].x - v[1].x) / (float)(y2 - y1);
+        float xa = (float)v[0].x + slope02 * (float)(y1 - y0);
+        float xb = (float)v[1].x;
+        for (int y = y1; y <= y2; y++, xa += slope02, xb += slope12)
+            _span_fill_grid((int)xa, (int)xb, y, px);
+    }
 }
 
 void WINPIXELCALL wpx_triangle_fill_ex (
@@ -926,6 +554,55 @@ void WINPIXELCALL wpx_bezier_thick (
 	}
 }
 
+/* Subtracts t from each RGB channel (clamped to 0), preserving alpha. */
+static inline Color32 _color_sub(Color32 c, uint8_t t) {
+    uint8_t r = (c >> 24) & 0xFF; r = r > t ? r - t : 0;
+    uint8_t g = (c >> 16) & 0xFF; g = g > t ? g - t : 0;
+    uint8_t b = (c >>  8) & 0xFF; b = b > t ? b - t : 0;
+    return ((Color32)r << 24) | ((Color32)g << 16) | ((Color32)b << 8) | (c & 0xFF);
+}
+
+WINPIXELDLL void WINPIXELCALL wpx_timegraph (WPX_TimeGraph *g, float value,
+    int x, int y, int w, int h, Color32 color) {
+
+    if (value < 0.0f) value = 0.0f;
+    if (value > 1.0f) value = 1.0f;
+
+    g->buf[g->head % WPX_TGRAPH_CAP] = value;
+    g->head++;
+    if (g->len < WPX_TGRAPH_CAP) g->len++;
+
+    wpx_rect_fill(x, y, w, h, 0x0D1117FF);
+
+    Color32 grid = 0x1E2836FF;
+    for (int q = 1; q < 4; q++)
+        wpx_line(x + 1, y + h * q / 4, x + w - 2, y + h * q / 4, grid);
+
+    int samples = g->len < w - 2 ? g->len : w - 2;
+    int start   = g->head - samples;
+    int prev_py = -1;
+
+    for (int i = 0; i < samples; i++) {
+        float v  = g->buf[(start + i + WPX_TGRAPH_CAP) % WPX_TGRAPH_CAP];
+        int   px = x + 1 + (w - 2 - samples) + i;
+        int   py = y + h - 2 - (int)(v * (h - 3));
+
+        wpx_line(px, py + 1, px, y + h - 2, _color_sub(color, 0xBB));
+
+        int y0 = prev_py < py ? prev_py : py;
+        int y1 = prev_py < py ? py : prev_py;
+        if (prev_py >= 0)
+            for (int sy = y0; sy <= y1; sy++)
+                wpx_pixel(px, sy, color);
+        else
+            wpx_pixel(px, py, color);
+
+        prev_py = py;
+    }
+
+    wpx_rect(x, y, w, h, 0x30363DFF);
+}
+
 // Draw spline segment: Linear, 2 points
 void WINPIXELCALL wpx_spline (
 	float     x,
@@ -933,7 +610,7 @@ void WINPIXELCALL wpx_spline (
 	float     w,
 	float     h,
 	float     thick,
-	Color32 color) {
+	Color32   color) {
 	// NOTE: For the linear spline we don't use subdivisions, just a single quad
 
 	vec2f delta = {w - x, h - y};
@@ -961,6 +638,44 @@ void WINPIXELCALL wpx_spline (
 		};
 		wpx_triangle_fill(v1, color);
 		wpx_triangle_fill(v2, color);
+	}
+}
+
+// Draw spline segment: Linear, 2 points
+void WINPIXELCALL wpx_spline_grid (
+	float     x,
+	float     y,
+	float     w,
+	float     h,
+	float     thick,
+	Color32   color) {
+	// NOTE: For the linear spline we don't use subdivisions, just a single quad
+
+	vec2f delta = {w - x, h - y};
+	float length = sqrtf(delta.x*delta.x + delta.y*delta.y);
+
+	if ((length > 0) && (thick > 0)) {
+		float scale = thick/(2*length);
+
+		vec2f radius = { -scale*delta.y, scale*delta.x };
+		vec2f strip[4] = {
+			{x - radius.x, y - radius.y},
+			{x + radius.x, y + radius.y},
+			{w - radius.x, h - radius.y},
+			{w + radius.x, h + radius.y}
+		};
+		vec2i v1[3] = {
+			{strip[0].x, strip[0].y},
+			{strip[1].x, strip[1].y},
+			{strip[2].x, strip[2].y},
+		};
+		vec2i v2[3] = {
+			{strip[1].x, strip[1].y},
+			{strip[2].x, strip[2].y},
+			{strip[3].x, strip[3].y},
+		};
+		wpx_triangle_fill_grid(v1, color);
+		wpx_triangle_fill_grid(v2, color);
 	}
 }
 
@@ -1018,9 +733,10 @@ void wpx_spline_segment_bezier_quadratic (
 	for (int i = 1; i <= SPLINE_SEGMENT_DIVISIONS; i++) {
 		t = step*(float)i;
 
-		float a = powf(1.0f - t, 2);
-		float b = 2.0f*(1.0f - t)*t;
-		float c = powf(t, 2);
+		float mt = 1.0f - t;
+		float a  = mt * mt;
+		float b  = 2.0f * mt * t;
+		float c  = t * t;
 
 		// NOTE: The easing functions aren't suitable here because they don't take a control point
 		current.y = a*p1.y + b*c2.y + c*p3.y;
@@ -1078,10 +794,13 @@ void wpx_spline_segment_bezier_cubic (
 	for (int i = 1; i <= SPLINE_SEGMENT_DIVISIONS; i++) {
 		t = step*(float)i;
 
-		float a = powf(1.0f - t, 3);
-		float b = 3.0f*powf(1.0f - t, 2)*t;
-		float c = 3.0f*(1.0f - t)*powf(t, 2);
-		float d = powf(t, 3);
+		float mt  = 1.0f - t;
+		float mt2 = mt * mt;
+		float t2  = t * t;
+		float a   = mt2 * mt;
+		float b   = 3.0f * mt2 * t;
+		float c   = 3.0f * mt  * t2;
+		float d   = t2 * t;
 
 		current.y = a*p1.y + b*c2.y + c*c3.y + d*p4.y;
 		current.x = a*p1.x + b*c2.x + c*c3.x + d*p4.x;

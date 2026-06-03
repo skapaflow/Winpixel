@@ -119,6 +119,21 @@ const char wpx_font_char[WPX_ASCII_LEN][WPX_ASCII_SIZE] = {
 	{"011110011110011110011110011110011110"} /* █ */ /* 127 */
 };
 
+/* Writes a size×size block directly to the framebuffer; clips to screen bounds. */
+static inline void _text_block(int x, int y, int size, Color32 px) {
+	int x1 = x + size - 1, y1 = y + size - 1;
+	if (x1 < 0 || x >= wpx_render.w || y1 < 0 || y >= wpx_render.h) return;
+	if (x  < 0) x = 0;
+	if (y  < 0) y = 0;
+	if (x1 >= wpx_render.w) x1 = wpx_render.w - 1;
+	if (y1 >= wpx_render.h) y1 = wpx_render.h - 1;
+	int w = x1 - x + 1;
+	for (int row = y; row <= y1; row++) {
+		Color32 *p = wpx_render.buffer_screen + row * wpx_render.w + x;
+		for (int i = 0; i < w; i++) *p++ = px;
+	}
+}
+
 void WINPIXELCALL wpx_text_standard (
 	int         center,
 	Color32     color,
@@ -129,50 +144,36 @@ void WINPIXELCALL wpx_text_standard (
 	int         y,
 	const char *string) {
 
-	int c = 0;
-	const int len = 6;
 	const int begin = 32;
 	scale += 1;
-	const int wsize = (scale * len);
+	const int wsize = scale * 6;
 
-	/* draw size pixel */
-	#define _wpx_block_(x2, y2, size, color) {\
-		for (int h2 = 0; h2 < size; h2++)\
-			for (int w2 = 0; w2 < size; w2++)\
-				wpx_pixel((x2 + w2), (y2 + h2), color),\
-				wpx_pixel((x2 + w2)+gap, (y2 + h2)+gap, bcolor);\
-		}
-
-	/* centralizer */
 	int str_len = (int)strlen(string);
-	int w_pix = scale*str_len*len/2;
-	int h_pix = scale*len/2;
+	int w_pix   = center ? scale * str_len * 6 / 2 : 0;
+	int h_pix   = center ? scale * 6 / 2           : 0;
 
-	/* set center text */
-	if (!center) {
-		w_pix = 0;
-		h_pix = 0;
-	}
+	Color32 fg_px = wpx_color_to_pixel(color);
+	Color32 bg_px = wpx_color_to_pixel(bcolor);
 
-	/* draw char */
-	for (int i = 0; i < str_len; i++)
-		for (int h = 0; h < len; h++)
-			for (int w = 0; w < len; w++) {
+	for (int i = 0; i < str_len; i++) {
+		int ci = (int)(unsigned char)string[i] - begin;
+		if (ci < 0 || ci >= WPX_ASCII_LEN) ci = WPX_ASCII_LEN - 1;
+		const char *glyph = wpx_font_char[ci];
 
-				c = ((string[i] - begin) < 0 || (string[i] - begin) > WPX_ASCII_LEN ? WPX_ASCII_LEN-1 : abs(string[i] - begin));
-				
-				if (wpx_font_char[c][w + (h * len)] == '1') {
-					_wpx_block_(
-						(x + (w * scale)) + (wsize * i) - w_pix, 
-						(y + (h * scale)) - h_pix, scale,
-						color
-					);
-					// if (scale == 1)
-						// wpx_pixel((x + w) + (len * i), (h + y), color);
+		int base_x = x + wsize * i - w_pix;
+		int base_y = y - h_pix;
+
+		for (int gy = 0; gy < 6; gy++) {
+			int py = base_y + gy * scale;
+			for (int gx = 0; gx < 6; gx++) {
+				if (glyph[gx + gy * 6] == '1') {
+					int px = base_x + gx * scale;
+					if (gap) _text_block(px + gap, py + gap, scale, bg_px);
+					_text_block(px, py, scale, fg_px);
 				}
 			}
-
-	#undef _wpx_block_
+		}
+	}
 }
 
 WINPIXELDLL void WINPIXELCALL wpx_text_ex (
