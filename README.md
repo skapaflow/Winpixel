@@ -13,7 +13,6 @@ Windows-only 2D graphics library in C, built as a DLL. Personal toolbox for rapi
 ## Build
 
 ```sh
-cd src
 make
 ```
 
@@ -55,6 +54,7 @@ int main() {
 - **Draw** — pixels, lines (solid, dashed, gap), rectangles, circles, ellipses, triangles, Bezier curves, thick splines; screen-door `_grid` variants for 50% transparency
 - **Sprites** — load PNG via stb_image; draw with scale, flip, sub-region; save sprite or screenshot to PNG
 - **Text** — built-in 6×6 bitmap font, printf-style, shadow, scale, measure
+- **Vector font** — smooth-scaling vector text loaded at runtime from `.vtf` files (`wpx_font_load`, `wpx_text_font`, `wpx_text_font_center`); glyphs are baked into coverage bitmaps and cached per scale, so zooming stays cheap
 - **Input** — keyboard (`VK_*`) and mouse (position, left/right/wheel, press/down/up states)
 - **Math** — lerp, map, clamp, wrap, noise (1D Perlin), distance, direction, color interpolation, line intersection
 - **Time** — FPS counter and delta time via `QueryPerformanceCounter`
@@ -67,7 +67,7 @@ Pre-built examples are in `examples/`. To compile them:
 
 ```sh
 # Build the DLL first
-cd src && make
+make
 
 # Then build examples
 cd examples && make
@@ -87,6 +87,7 @@ cd examples && make
 | `timegraph.exe` | Live waveform display using `wpx_timegraph` (FPS, sin, Perlin noise) |
 | `cube.exe` | Flat-shaded dithered cube with mouse-wheel zoom |
 | `bunny.exe` | Stanford bunny — flat dither, dynamic mouse light, palette cycling |
+| `font.exe` | Vector font (`.vtf`) with smooth mouse-wheel zoom |
 
 ## License
 
