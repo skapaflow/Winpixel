@@ -11,7 +11,7 @@
  *   winpixel_window("Title", 800, 600, true);
  *   while (wpx_quit && !wpx_key_down(VK_ESCAPE)) {
  *       // draw here
- *       winpixel_render(BLACK, 1);
+ *       winpixel_render(BLUEPRINT, 1);
  *   }
  */
 
@@ -296,6 +296,7 @@ WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_grid (vec2i *triangle, Color32 c
 WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_ex (vec2f *triangle, float x, float y, float scale, float angle, Color32 color); /* triangle[3], rotate+scale+translate */
 WINPIXELDLL void WINPIXELCALL wpx_ellipse (int x, int y, int radius_x, int radius_y, Color32 color);
 WINPIXELDLL void WINPIXELCALL wpx_bezier_thick (vec2f startPos, vec2f endPos, float thick, Color32 color); /* cubic bezier, no control points */
+WINPIXELDLL void WINPIXELCALL wpx_bezier_thick_grid (vec2f startPos, vec2f endPos, float thick, Color32 color); /* cubic bezier, no control points */
 WINPIXELDLL void WINPIXELCALL wpx_spline (float px, float py, float pw, float ph, float thick, Color32 color); /* thick line segment */
 WINPIXELDLL void WINPIXELCALL wpx_spline_grid (float px, float py, float pw, float ph, float thick, Color32 color); /* thick line segment */
 WINPIXELDLL void WINPIXELCALL wpx_spline_gap (int x, int y, int w, int h, float thick, Color32 color);
@@ -320,6 +321,14 @@ WINPIXELDLL void WINPIXELCALL wpx_text_center (Color32 color, int scale, int x, 
 WINPIXELDLL void WINPIXELCALL wpx_text_ex (int center, Color32 color, int scale, Color32 bcolor, int gap, int x, int y, const char *fmt, ...); /* center=1 centers text; bcolor=background shadow color */
 WINPIXELDLL void WINPIXELCALL wpx_text_measure (const char *str, int scale, int *w, int *h); /* total pixel size of str at given scale */
 WINPIXELDLL const char WINPIXELCALL *cat (const char *fmt, ...);
+// -------------------------
+// Font - vector text, smooth scaling (public API)
+// -------------------------
+typedef struct WPX_Font WPX_Font; /* opaque; loaded from a .vtf file */
+WINPIXELDLL WPX_Font *WINPIXELCALL wpx_font_load (const char *path);  /* load a .vtf font; NULL on error */
+WINPIXELDLL void      WINPIXELCALL wpx_font_free (WPX_Font *font);
+WINPIXELDLL void WINPIXELCALL wpx_text_font (WPX_Font *font, Color32 color, float scale, int x, int y, const char *fmt, ...);        /* x,y = top-left; scale = pixels per font unit */
+WINPIXELDLL void WINPIXELCALL wpx_text_font_center (WPX_Font *font, Color32 color, float scale, int x, int y, const char *fmt, ...); /* x,y = center of the text block */
 // -------------------------
 // Sprite - public API
 // -------------------------

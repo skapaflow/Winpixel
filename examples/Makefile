@@ -4,7 +4,7 @@ CC      = clang
 CFLAGS  = -Wall -Wextra -s -O2 -I"../src"
 LDFLAGS = -L"../lib" -lwinpixel
 
-NAMES   = sprite trails triangle template noise primitives bezier paint clock timegraph cube bunny
+NAMES   = sprite trails triangle template noise primitives bezier paint clock timegraph cube bunny font
 TARGETS = $(NAMES:=.exe)
 
 all: $(TARGETS)

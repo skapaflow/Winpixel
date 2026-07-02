@@ -6,7 +6,7 @@
 #define SCR_W  800
 #define SCR_H  600
 
-/* câmera em (0,0,-CAM_Z) olhando +Z — mesmo setup do cube.c */
+/* camera at (0,0,-CAM_Z) looking +Z — same setup as cube.c */
 #define CAM_Z  3.5f
 #define FOCAL  233.8f
 
@@ -162,12 +162,12 @@ static const char BUNNY[] =
 	"3,37,4,130,3,142,151,147,3,123,149,142,3,24,85,22,3,123,155,149,3,151,148,147,"
 	"3,149,186,151,3,180,130,80,";
 
-static float vx[MAX_V], vy[MAX_V], vz[MAX_V];  /* posições              */
-static float fn[MAX_F][3];                       /* normais por face      */
-static int   fi[MAX_F][3];                       /* índices (0-based)     */
+static float vx[MAX_V], vy[MAX_V], vz[MAX_V];  /* positions             */
+static float fn[MAX_F][3];                       /* per-face normals      */
+static int   fi[MAX_F][3];                       /* indices (0-based)     */
 static int   nv, nf;
 
-/* ── 17 padrões dither — mesmo b_tbl do cube.c ───────────────── */
+/* ── 17 dither patterns — same b_tbl as cube.c ───────────────── */
 static const uint16_t b_tbl[17] = {
 	0x0000, 0x0001, 0x8020, 0x080a, 0x050a,
 	0x5250, 0x8525, 0x25a5, 0xa5a5, 0xa5ad,
@@ -175,7 +175,7 @@ static const uint16_t b_tbl[17] = {
 	0xfeff, 0xffff
 };
 
-/* ── paletas (dark, light) ────────────────────────────────────── */
+/* ── palettes (dark, light) ───────────────────────────────────── */
 static const Color32 pal[6][2] = {
 	{0x000020FF, 0x29ADFFFF},
 	{0x002000FF, 0x00E436FF},
@@ -202,7 +202,7 @@ static void parse_bunny(void) {
 		int b = (int)strtol(p, &end, 10) - 1; p = end + 1;
 		int c = (int)strtol(p, &end, 10) - 1; p = end + 1;
 		fi[i][0] = a; fi[i][1] = b; fi[i][2] = c;
-		/* normal por face (produto cruzado + normalização) */
+		/* per-face normal (cross product + normalization) */
 		float ax = vx[b]-vx[a], ay = vy[b]-vy[a], az = vz[b]-vz[a];
 		float bx = vx[c]-vx[a], by = vy[c]-vy[a], bz = vz[c]-vz[a];
 		float nx = ay*bz-az*by, ny = az*bx-ax*bz, nz = ax*by-ay*bx;
@@ -212,7 +212,7 @@ static void parse_bunny(void) {
 	}
 }
 
-/* ── math 3×3 row-major — mesmo do cube.c ────────────────────── */
+/* ── math 3×3 row-major — same as cube.c ─────────────────────── */
 static void m3_identity(float m[9]) {
 	memset(m, 0, 36); m[0] = m[4] = m[8] = 1.0f;
 }
@@ -226,7 +226,7 @@ static void m3_roty(float m[9], float a) {
 	m3_identity(m); m[0]=c; m[2]=s; m[6]=-s; m[8]=c;
 }
 
-/* ── projeção — igual ao cube.c ───────────────────────────────── */
+/* ── projection — same as cube.c ──────────────────────────────── */
 static void proj_v(const float v[3], float *sx, float *sy, float *sz) {
 	float z = v[2] + CAM_Z;
 	if (z < 0.01f) z = 0.01f;
@@ -236,7 +236,7 @@ static void proj_v(const float v[3], float *sx, float *sy, float *sz) {
 	*sz = z;
 }
 
-/* ── rasterizador flat-dither — copiado do cube.c ────────────── */
+/* ── flat-dither rasterizer — copied from cube.c ─────────────── */
 static void hline(int y, int x0, int x1,
 				  uint16_t pat, Color32 dk, Color32 lt) {
 	if (x0 > x1) { int t=x0; x0=x1; x1=t; }
@@ -299,7 +299,7 @@ int main (void) {
 
 	parse_bunny();
 
-	/* centraliza o mesh */
+	/* center the mesh */
 	float cx=0, cy=0, cz=0;
 	for (int i=0; i<nv; i++) { cx+=vx[i]; cy+=vy[i]; cz+=vz[i]; }
 	cx/=nv; cy/=nv; cz/=nv;
@@ -325,7 +325,7 @@ int main (void) {
 
 		m3_roty(rot, angle_y);
 
-		/* transforma e projeta vértices */
+		/* transform and project vertices */
 		for (int i=0; i<nv; i++) {
 			float sv[3] = { vx[i]*scale, vy[i]*scale, vz[i]*scale };
 			m3_mulv(rot, sv, vw[i]);
@@ -345,7 +345,7 @@ int main (void) {
 		}
 		qsort(sort_buf, ndraw, sizeof(FSE), cmp_depth);
 
-		/* direção da luz: mouse normalizado → esfera hemisférica */
+		/* light direction: normalized mouse → hemispherical sphere */
 		float ldir[3];
 		ldir[0] = -(wpx_mouse.x / (float)SCR_W) * 2.0f + 1.0f;
 		ldir[1] =  (wpx_mouse.y / (float)SCR_H) * 2.0f - 1.0f;
@@ -355,12 +355,12 @@ int main (void) {
 
 		Color32 dk=pal[palidx][0], lt=pal[palidx][1];
 
-		/* rasteriza com flat dither — sistema do cube.c */
+		/* rasterize with flat dither — same system as cube.c */
 		for (int k=0; k<ndraw; k++) {
 			int i = sort_buf[k].idx;
 			int a=fi[i][0], b=fi[i][1], c=fi[i][2];
 
-			/* normal da face em world space */
+			/* face normal in world space */
 			float wn[3];
 			m3_mulv(rot, fn[i], wn);
 

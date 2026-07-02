@@ -57,6 +57,7 @@ WINPIXELDLL Color32 WINPIXELCALL wpx_getpixel (int x, int y) {
 
 /* Fills a horizontal span directly into the framebuffer; clips and skips out-of-bounds rows. */
 static inline void _span_fill(int x0, int x1, int y, Color32 px) {
+
     if (y < 0 || y >= wpx_render.h) return;
     if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
     if (x0 >= wpx_render.w || x1 < 0) return;
@@ -68,6 +69,7 @@ static inline void _span_fill(int x0, int x1, int y, Color32 px) {
 
 /* Same but screen-door: only pixels where (x+y) is odd (checkerboard 50% transparency). */
 static inline void _span_fill_grid(int x0, int x1, int y, Color32 px) {
+
     if (y < 0 || y >= wpx_render.h) return;
     if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
     if (x0 >= wpx_render.w || x1 < 0) return;
@@ -116,9 +118,9 @@ WINPIXELDLL void WINPIXELCALL wpx_line (int x0, int y0, int x1, int y1, Color32 
 }
 
 /*
- * A linha é dividida por 5, ficando (0,1,2,3,4), e os valores
- * 1 e 3 serão as cordenadas de inicio e fim para a criação
- * da linha.
+ * The line is divided by 5, giving (0,1,2,3,4), and the values
+ * 1 and 3 become the start and end coordinates used to build
+ * the line.
  */
 void WINPIXELCALL wpx_line_gap (int x, int y, int w, int h, Color32 color) {
 
@@ -232,7 +234,8 @@ WINPIXELDLL void WINPIXELCALL wpx_circle_fill (int xc, int yc, int radius, Color
     }
 }
 
-WINPIXELDLL void WINPIXELCALL wpx_triangle_fill(vec2i *triangle, Color32 col) {
+WINPIXELDLL void WINPIXELCALL wpx_triangle_fill (vec2i *triangle, Color32 col) {
+
     Color32 px = wpx_color_to_pixel(col);
 
     vec2i v[3] = { triangle[0], triangle[1], triangle[2] };
@@ -243,22 +246,28 @@ WINPIXELDLL void WINPIXELCALL wpx_triangle_fill(vec2i *triangle, Color32 col) {
     int y0 = v[0].y, y1 = v[1].y, y2 = v[2].y;
     if (y0 == y2) return;
 
-    float slope02 = (float)(v[2].x - v[0].x) / (float)(y2 - y0);
+    /* Scanline rasterization in 16.16 fixed-point. Integer math is exact and
+       deterministic: the per-line increment (xa += dxdy) doesn't accumulate
+       drift, so the shared edge (diagonal) between the 2 triangles of a quad
+       produces the same pixels on both sides — no gap. `>> 16` floors
+       (also for negative x), making the fill invariant to translation.
+       int64 avoids overflow for large coordinates off-screen. */
+    int64_t dxdy02 = ((int64_t)(v[2].x - v[0].x) << 16) / (y2 - y0);
+    int64_t xa = (int64_t)v[0].x << 16;   /* edge v0->v2, advances from y0 to y2 */
 
     if (y0 < y1) {
-        float slope01 = (float)(v[1].x - v[0].x) / (float)(y1 - y0);
-        float xa = (float)v[0].x, xb = (float)v[0].x;
-        for (int y = y0; y < y1; y++, xa += slope02, xb += slope01)
-            _span_fill((int)xa, (int)xb, y, px);
+        int64_t dxdy01 = ((int64_t)(v[1].x - v[0].x) << 16) / (y1 - y0);
+        int64_t xb = (int64_t)v[0].x << 16;
+        for (int y = y0; y < y1; y++, xa += dxdy02, xb += dxdy01)
+            _span_fill((int)(xa >> 16), (int)(xb >> 16), y, px);
     }
 
-    if (y1 < y2) {
-        float slope12 = (float)(v[2].x - v[1].x) / (float)(y2 - y1);
-        float xa = (float)v[0].x + slope02 * (float)(y1 - y0);
-        float xb = (float)v[1].x;
-        for (int y = y1; y <= y2; y++, xa += slope02, xb += slope12)
-            _span_fill((int)xa, (int)xb, y, px);
-    }
+    /* y1 <= y2 always (post-sort); when y1 == y2 (flat base) we still
+       need to fill that line, so we just guard the division. */
+    int64_t dxdy12 = (y1 < y2) ? ((int64_t)(v[2].x - v[1].x) << 16) / (y2 - y1) : 0;
+    int64_t xb = (int64_t)v[1].x << 16;
+    for (int y = y1; y <= y2; y++, xa += dxdy02, xb += dxdy12)
+        _span_fill((int)(xa >> 16), (int)(xb >> 16), y, px);
 }
 
 /* DEFINITION: SCREEN-DOOR TRANSPARENCY, ORDERED DITHERING */
@@ -292,22 +301,24 @@ WINPIXELDLL void WINPIXELCALL wpx_triangle_fill_grid(vec2i *triangle, Color32 co
     int y0 = v[0].y, y1 = v[1].y, y2 = v[2].y;
     if (y0 == y2) return;
 
-    float slope02 = (float)(v[2].x - v[0].x) / (float)(y2 - y0);
+    /* Fixed-point 16.16 scanline (see wpx_triangle_fill): keeps the shared
+       diagonal identical between the quad's two triangles. */
+    int64_t dxdy02 = ((int64_t)(v[2].x - v[0].x) << 16) / (y2 - y0);
+    int64_t xa = (int64_t)v[0].x << 16;
 
     if (y0 < y1) {
-        float slope01 = (float)(v[1].x - v[0].x) / (float)(y1 - y0);
-        float xa = (float)v[0].x, xb = (float)v[0].x;
-        for (int y = y0; y < y1; y++, xa += slope02, xb += slope01)
-            _span_fill_grid((int)xa, (int)xb, y, px);
+        int64_t dxdy01 = ((int64_t)(v[1].x - v[0].x) << 16) / (y1 - y0);
+        int64_t xb = (int64_t)v[0].x << 16;
+        for (int y = y0; y < y1; y++, xa += dxdy02, xb += dxdy01)
+            _span_fill_grid((int)(xa >> 16), (int)(xb >> 16), y, px);
     }
 
-    if (y1 < y2) {
-        float slope12 = (float)(v[2].x - v[1].x) / (float)(y2 - y1);
-        float xa = (float)v[0].x + slope02 * (float)(y1 - y0);
-        float xb = (float)v[1].x;
-        for (int y = y1; y <= y2; y++, xa += slope02, xb += slope12)
-            _span_fill_grid((int)xa, (int)xb, y, px);
-    }
+    /* y1 <= y2 always (post-sort); when y1 == y2 (flat base) we still
+       need to fill that line, so we just guard the division. */
+    int64_t dxdy12 = (y1 < y2) ? ((int64_t)(v[2].x - v[1].x) << 16) / (y2 - y1) : 0;
+    int64_t xb = (int64_t)v[1].x << 16;
+    for (int y = y1; y <= y2; y++, xa += dxdy02, xb += dxdy12)
+        _span_fill_grid((int)(xa >> 16), (int)(xb >> 16), y, px);
 }
 
 void WINPIXELCALL wpx_triangle_fill_ex (
@@ -551,6 +562,61 @@ void WINPIXELCALL wpx_bezier_thick (
 			{points[i+2].x, points[i+2].y},
 		};
 		wpx_triangle_fill(v, color);
+	}
+}
+
+// Draw line using cubic-bezier spline, in-out interpolation, no control points
+void WINPIXELCALL wpx_bezier_thick_grid (
+	vec2f    startPos,
+	vec2f    endPos,
+	float    thick,
+	Color32 color) {
+
+	vec2f previous = startPos;
+	vec2f current = {0};
+
+	vec2f points[2*SPLINE_SEGMENT_DIVISIONS + 2] = {0};
+
+	for (int i = 1; i <= SPLINE_SEGMENT_DIVISIONS; i++) {
+		// Cubic easing in-out
+		// NOTE: Easing is calculated only for y position value
+		current.y = wpx_ease_cubic_in_out(
+			(float)i,
+			startPos.y,
+			endPos.y - startPos.y,
+			(float)SPLINE_SEGMENT_DIVISIONS
+		);
+		current.x = previous.x + (endPos.x - startPos.x)/(float)SPLINE_SEGMENT_DIVISIONS;
+
+		float dy = current.y - previous.y;
+		float dx = current.x - previous.x;
+		float size = 0.5f*thick/sqrtf(dx*dx+dy*dy);
+
+		if (i == 1) {
+			points[0].x = previous.x + dy*size;
+			points[0].y = previous.y - dx*size;
+			points[1].x = previous.x - dy*size;
+			points[1].y = previous.y + dx*size;
+		}
+
+		points[2*i + 1].x = current.x - dy*size;
+		points[2*i + 1].y = current.y + dx*size;
+		points[2*i].x = current.x + dy*size;
+		points[2*i].y = current.y - dx*size;
+
+		previous = current;
+	}
+
+	int lot = (2*SPLINE_SEGMENT_DIVISIONS + 2);
+
+	/* draw closed polygon */
+	for (int i = 0; i < (lot - 2); i++) {
+		vec2i v[3] = {
+			{points[i+0].x, points[i+0].y},
+			{points[i+1].x, points[i+1].y},
+			{points[i+2].x, points[i+2].y},
+		};
+		wpx_triangle_fill_grid(v, color);
 	}
 }
 

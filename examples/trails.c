@@ -23,7 +23,7 @@ void vector_tail (VEC_TAIL *vt, vec2f pos, int len, float time, uint32_t color) 
 
 	#define DEBUG 0
 
-	/* limite do vetor em VEC_TAIL */
+	/* clamp to VEC_TAIL's array size */
 	len = fminf(len, (sizeof(vt->v) / sizeof((vt->v)[0])));
 
 #if 0
@@ -65,13 +65,13 @@ void vector_tail (VEC_TAIL *vt, vec2f pos, int len, float time, uint32_t color) 
 			printf("\n");
 		#endif
 		vt->step = 0;
-		/* expandir lista */
+		/* grow the list */
 		vt->lot += (vt->lot < len ? 1 : -1);
 		vt->lot = fmaxf(vt->lot, 0);
-		/* Move os elementos para a direita */
+		/* shift elements to the right */
 		for (int j = (vt->lot - 1); j > 0; j--)
 			vt->v[j] = vt->v[j - 1];
-		/* adicionar no inicio */
+		/* add at the front */
 		if (vt->lot <= len) {
 			vt->v[0].x = pos.x;
 			vt->v[0].y = pos.y;

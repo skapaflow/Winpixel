@@ -1,10 +1,10 @@
 SHELL = cmd.exe
 
 CC      = clang
-CFLAGS  = -Wall -Wextra -O2 -I src -D WINPIXEL_DLL
+CFLAGS  = -Wall -Wextra -O3 -I src -D WINPIXEL_DLL
 LDFLAGS = -shared -s -Wl,--out-implib,lib/winpixel.lib -lgdi32 -luser32 -lcomdlg32 -lshell32
 
-SRCS = src/winpixel.c src/input.c src/draw.c src/time.c src/print.c src/sprite.c src/math.c
+SRCS = src/winpixel.c src/input.c src/draw.c src/time.c src/print.c src/sprite.c src/math.c src/font.c
 OBJS = $(SRCS:src/%.c=lib/obj/%.o)
 
 all: lib/winpixel.dll

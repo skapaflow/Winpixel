@@ -10,13 +10,13 @@
 #define NEAR  0.1f
 #define FAR   20.0f
 
-/* câmera em (0,0,-CAM_Z) olhando +Z */
+/* camera at (0,0,-CAM_Z) looking +Z */
 #define CAM_Z  3.5f
-/* FOCAL = (SCR_H/2) / tan(30°)  →  FOV vertical 60° */
+/* FOCAL = (SCR_H/2) / tan(30°)  →  60° vertical FOV */
 #define FOCAL  233.8f
 
-/* ── 17 padrões dither (de s-buffer.lua) ─────────────────────
-   pixel (x,y) aceso se: (pat >> (15 - (x&3) - (y&3)*4)) & 1  */
+/* ── 17 dither patterns (from s-buffer.lua) ───────────────────
+   pixel (x,y) is on if: (pat >> (15 - (x&3) - (y&3)*4)) & 1  */
 static const uint16_t b_tbl[17] = {
     0x0000, 0x0001, 0x8020, 0x080a, 0x050a,
     0x5250, 0x8525, 0x25a5, 0xa5a5, 0xa5ad,
@@ -24,17 +24,17 @@ static const uint16_t b_tbl[17] = {
     0xfeff, 0xffff
 };
 
-/* ── paleta por face (dark, light) ───────────────────────────── */
+/* ── palette per face (dark, light) ────────────────────────────── */
 static const Color32 fpal[6][2] = {
-    { 0x000040FF, 0x29ADFFFF },  /* +Z  azul     */
-    { 0x003B00FF, 0x00E436FF },  /* -Z  verde    */
-    { 0x3F2000FF, 0xFF8C00FF },  /* -X  laranja  */
-    { 0x3F0010FF, 0xFF004DFF },  /* +X  vermelho */
-    { 0x303030FF, 0xC0C0C0FF },  /* +Y  cinza    */
-    { 0x3F3F00FF, 0xFFEC27FF },  /* -Y  amarelo  */
+    { 0x000040FF, 0x29ADFFFF },  /* +Z  blue     */
+    { 0x003B00FF, 0x00E436FF },  /* -Z  green    */
+    { 0x3F2000FF, 0xFF8C00FF },  /* -X  orange   */
+    { 0x3F0010FF, 0xFF004DFF },  /* +X  red      */
+    { 0x303030FF, 0xC0C0C0FF },  /* +Y  gray     */
+    { 0x3F3F00FF, 0xFFEC27FF },  /* -Y  yellow   */
 };
 
-/* ── geometria do cubo ───────────────────────────────────────── */
+/* ── cube geometry ─────────────────────────────────────────────── */
 static const float cv[8][3] = {
     {-1,-1,-1},{1,-1,-1},{1,1,-1},{-1,1,-1},
     {-1,-1, 1},{1,-1, 1},{1,1, 1},{-1,1, 1}
@@ -48,7 +48,7 @@ static const float cn[6][3] = {
     {0,0,1},{0,0,-1},{-1,0,0},{1,0,0},{0,1,0},{0,-1,0}
 };
 
-/* luz de (1,2,-1) normalizada */
+/* light from (1,2,-1), normalized */
 static const float LDIR[3] = { 0.4082f, 0.8165f, -0.4082f };
 
 /* ── math 3×3 row-major ──────────────────────────────────────── */
@@ -74,7 +74,7 @@ static void m3_rotx(float m[9], float a) {
     m3_identity(m); m[4]=c; m[5]=-s; m[7]=s; m[8]=c;
 }
 
-/* ── projeção ─────────────────────────────────────────────────── */
+/* ── projection ───────────────────────────────────────────────── */
 static void proj_v(const float v[3], float *sx, float *sy, float *sz) {
     float z = v[2] + CAM_Z;
     if (z < 0.01f) z = 0.01f;
@@ -84,7 +84,7 @@ static void proj_v(const float v[3], float *sx, float *sy, float *sz) {
     *sz = z;
 }
 
-/* ── rasterizador flat-dither ────────────────────────────────── */
+/* ── flat-dither rasterizer ─────────────────────────────────────── */
 static void hline(int y, int x0, int x1,
                   uint16_t pat, Color32 dk, Color32 lt) {
     if (x0 > x1) { int t=x0; x0=x1; x1=t; }
@@ -98,7 +98,7 @@ static void hline(int y, int x0, int x1,
 
 typedef struct { float x, y; } V2;
 
-/* stepping sub-pixel para evitar wobble nas arestas */
+/* sub-pixel stepping to avoid wobble on the edges */
 static void fill_tri(V2 a, V2 b, V2 c,
                      uint16_t pat, Color32 dk, Color32 lt) {
     if (a.y>b.y){V2 t=a;a=b;b=t;}
@@ -174,20 +174,20 @@ int main(void) {
         for (int f=0; f<6; f++) {
             float wn[3];
             m3_mulv(rot, cn[f], wn);
-            if (wn[2] >= 0.0f) continue;  /* aponta para longe da câmera */
+            if (wn[2] >= 0.0f) continue;  /* points away from the camera */
             float d = vsz[cf[f][0]]+vsz[cf[f][1]]+
                       vsz[cf[f][2]]+vsz[cf[f][3]];
             faces[nf++] = (FE){f, d};
         }
         qsort(faces, nf, sizeof(FE), cmp_fe);
 
-        /* rasteriza */
+        /* rasterize */
         for (int k=0; k<nf; k++) {
             int f = faces[k].face;
             float wn[3];
             m3_mulv(rot, cn[f], wn);
 
-            /* brightness flat por face com ambient mínimo */
+            /* flat per-face brightness with a small ambient floor */
             float br = 0.1f + 0.9f * fmaxf(0.0f,
                 wn[0]*LDIR[0] + wn[1]*LDIR[1] + wn[2]*LDIR[2]);
             int bi = (int)(br * 16.0f + 0.5f);
@@ -196,7 +196,7 @@ int main(void) {
             uint16_t pat = b_tbl[bi];
             Color32  dk  = fpal[f][0], lt = fpal[f][1];
 
-            /* quad → 2 triângulos */
+            /* quad → 2 triangles */
             V2 p[4];
             for (int i=0; i<4; i++)
                 p[i] = (V2){ vsx[cf[f][i]], vsy[cf[f][i]] };
